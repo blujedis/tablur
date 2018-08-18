@@ -1,0 +1,92 @@
+{
+  "name": "tablur",
+  "version": "1.0.8",
+  "description": "Easily create tables for your cli.",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "clean": "node ./build clean",
+    "copy": "node ./build copy",
+    "compile": "node ./build compile",
+    "bump": "node ./build bump",
+    "build": "node ./build build",
+    "commit": "node ./build commit",
+    "docs": "node ./build docs",
+    "release": "node ./build release",
+    "benchmark": "node ./bench",
+    "test": "node ./build test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blujedis/tablur.git"
+  },
+  "build": {
+    "clean": [
+      "./dist"
+    ],
+    "copy": []
+  },
+  "nyc": {
+    "include": [
+      "src/**/*.ts",
+      "src/**/*.tsx"
+    ],
+    "exclude": [
+      "src/**/*.spec.ts"
+    ],
+    "extension": [
+      ".ts",
+      ".tsx"
+    ],
+    "require": [
+      "./build/spec"
+    ],
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "sourceMap": true,
+    "instrument": true
+  },
+  "keywords": [
+    "cli",
+    "table",
+    "tables",
+    "text-tables",
+    "cliui",
+    "command-line",
+    "layout",
+    "design",
+    "console",
+    "wrap",
+    "truncate"
+  ],
+  "author": "Blu Jedi <blujedicorp@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/blujedis/tablur/issues"
+  },
+  "homepage": "https://github.com/blujedis/tablur#readme",
+  "devDependencies": {
+    "@types/chai": "^4.1.4",
+    "@types/mocha": "^5.2.4",
+    "@types/node": "^10.5.2",
+    "benchmark": "^2.1.4",
+    "chai": "^4.1.2",
+    "cliui": "^4.1.0",
+    "mocha": "^5.1.1",
+    "nyc": "^11.8.0",
+    "stiks": "^1.1.6",
+    "ts-node": "^6.2.0",
+    "tslint": "^5.10.0",
+    "typedoc": "^0.11.1",
+    "typescript": "^2.9.2"
+  },
+  "dependencies": {
+    "colurs": "^1.0.29",
+    "string-width": "^2.1.1",
+    "strip-ansi": "^4.0.0",
+    "term-size": "^1.2.0",
+    "wrap-ansi": "^3.0.1"
+  }
+}

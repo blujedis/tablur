@@ -1,0 +1,4 @@
+src/**/*.spec.ts*
+--ignoreWarnings
+--require source-map-support/register
+--bail

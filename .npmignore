@@ -1,0 +1,14 @@
+.tmp/
+test.js
+temp.js
+temp.ts
+test.ts
+temp.html
+test.html
+.vscode/
+tslint.json
+typedoc.json
+src/
+build/
+dist/test
+dist/debug*

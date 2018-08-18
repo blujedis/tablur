@@ -1,0 +1,17 @@
+{
+  "name": "Tablur",
+  "mode": "modules",
+  "theme": "default",
+  "readme": "README.md",
+  "module": "commonjs",
+  "ignoreCompilerErrors": "true",
+  "experimentalDecorators": "true",
+  "emitDecoratorMetadata": "true",
+  "target": "ES6",
+  "moduleResolution": "node",
+  "preserveConstEnums": "true",
+  "stripInternal": "true",
+  "suppressExcessPropertyErrors": "true",
+  "suppressImplicitAnyIndexErrors": "true",
+  "exclude": "**/*+(e2e|spec|debug).ts"
+}
