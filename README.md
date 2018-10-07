@@ -79,6 +79,39 @@ table.row('Some Title|center');
 table.row('Username|30|left|0:1:0:1', 'Email|50');
 ```
 
+### Debug
+
+What to know what's going on with Tablur's output? Create table passing in "true" to show padding, alignment and shifting. This was used during development but found it so handy just left it in. If something isn't responding as you expect give it a try, it will do one of two things. 1) Help you adjust your column or 2) show you a bug we need to fix!
+
+```ts
+const table = new Tablur(true);
+
+// OR
+
+const table = new Tablur({ /* options here */ }, true);
+```
+
+Characters
+
+**A** - Represents alignment padding.
+**P** - Represents padding.
+**S** - Represents shifted text at boundary.
+**>** - Represents indent spaces.
+
+```sh
+╭──────────────────────────────────────────────────────────╮
+│Root Path:AAAAAAAA │ .myappAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Import Path:AAAAAA │ dist/myapp.jsAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Source Path:AAAAAA │ src/myapp.tsAAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Output Path:AAAAAA │ srcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Template:AAAAAAAAA │ my.template.jsAAAAAAAAAAAAAAAAAAAAAAA│
+╰──────────────────────────────────────────────────────────╯
+```
+
 ## Options
 
 A quick note on "padding". The vertical padding is not 1 to 1. This is because it gets pretty huge when you do that. Hence verticle padding is divided by 2. This looks a little better when scaling padding. Just keep that in mind.
