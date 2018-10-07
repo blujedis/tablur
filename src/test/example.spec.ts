@@ -1,42 +1,43 @@
-import { Tablur, TablurAlign, TablurScheme, TablurColor } from '../';
-import { Colurs } from 'colurs';
-
-const colurs = new Colurs();
+import { Tablur } from '../';
 
 const table = new Tablur({
-  width: 80, padding: 0
+  width: 80
 });
 
-table.header('Tablur CLI Tables', TablurAlign.center);
+table
+  .section('Tablur CLI Tables', 'center')
+  .break();
 
-table.footer({ text: '© 2018 Tablur', align: TablurAlign.center });
-
-table.row(
+table.row([
   { text: 'app run --dev' },
   { text: 'Runs the app.' },
-  { text: 'Alias: r', align: TablurAlign.right }
+  { text: 'Alias: r', align: 'right' }]
 );
 
 table.row(
-  { text: 'app create <name>' },
+  [{ text: 'app create <name>' },
   { text: 'Creates an app.' },
-  { text: 'Alias: c', align: TablurAlign.right }
+  { text: 'Alias: c', align: 'right' }]
 );
 
 table.break();
 
-table.section('Options:\n', TablurAlign.left);
+table.section('Options:\n', 'left');
 
 table.row(
-  { text: ' <name>' },
+  [{ text: ' <name>' },
   { text: 'App name to create.' },
-  { text: '[string] [required]', align: TablurAlign.right }
+  { text: '[string] [required]', align: 'right' }]
 );
 
 table.row(
-  { text: ' --dev, -d' },
+  [{ text: ' --dev, -d' },
   { text: 'Runs in dev mode.' },
-  { text: '[boolean]', align: TablurAlign.right }
+  { text: '[boolean]', align: 'right' }]
 );
+
+table
+  .break()
+  .section({ text: '© 2018 Tablur', align: 'center' });
 
 export = table;

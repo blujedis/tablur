@@ -1,24 +1,9 @@
-export declare enum TablurBorder {
-    single = "single",
-    double = "double",
-    round = "round",
-    single_double = "single-double",
-    double_single = "double-single",
-    classic = "classic"
-}
-export declare enum TablurAlign {
-    left = "left",
-    right = "right",
-    center = "center"
-}
-export declare enum TablurScheme {
-    wrap = "wrap",
-    truncate = "truncate",
-    none = "none"
-}
-export interface ITablurMap<T> {
-    [key: string]: T;
-}
+/// <reference types="node" />
+export declare type TablurAlign = 'left' | 'right' | 'center' | 'none';
+export declare type TablurStringLength = (str: string) => number;
+export declare type TablurBorder = keyof ITablurBorders;
+export declare type TablurPadding = number | [number, number, number, number];
+export declare type TablurBorderColor = 'red' | 'green' | 'blue' | 'yellow' | 'cyan' | 'magenta' | 'black' | 'gray' | 'redBright' | 'greenBright' | 'blueBright' | 'cyanBright' | 'yellowBright' | 'magentaBright';
 export interface ITablurBorder {
     topLeft: string;
     topRight: string;
@@ -27,50 +12,48 @@ export interface ITablurBorder {
     horizontal: string;
     vertical: string;
 }
-export interface ITablurColumn {
-    text?: string;
-    align?: TablurAlign;
-    size?: number;
-    configure?: boolean;
+export interface ITablurBorders {
+    single: ITablurBorder;
+    double: ITablurBorder;
+    round: ITablurBorder;
+    singleDouble: ITablurBorder;
+    doubleSingle: ITablurBorder;
+    classic: ITablurBorder;
+}
+export interface ITablurColumnBase {
+    width?: number;
+    align?: string;
+    padding?: [number, number, number, number];
+    indent?: number;
+    shift?: boolean;
+    borders?: boolean;
+}
+export interface ITablurColumnGlobal extends ITablurColumnBase {
+}
+export interface ITablurColumn extends ITablurColumnBase {
+    text: any;
+    isRepeat?: boolean;
+    isRow?: boolean;
+    isSection?: boolean;
 }
 export interface ITablurColumnInternal extends ITablurColumn {
-    length?: number;
-    lines?: string[];
-    adjusted?: number;
+    padRow: string;
 }
-export interface ITablurConfig {
-    columns?: number[];
-    total?: number;
-    layout?: number;
-    adjustedLayout?: number;
-    adjustment?: number;
-    remainder?: number;
-    lines?: {
-        [key: string]: number;
-    };
-    rows?: ITablurColumnInternal[][];
+export interface ITablurTokens {
+    pad: string;
+    align: string;
+    indent: string;
+    shift: string;
 }
-export declare enum TablurColor {
-    'black' = "black",
-    'red' = "red",
-    'green' = "green",
-    'blue' = "blue",
-    'magenta' = "magenta",
-    'cyan' = "cyan",
-    'gray' = "gray"
-}
-export interface ITablurOptionsBase {
+export interface ITablurOptions {
+    stream?: NodeJS.WritableStream;
     width?: number;
-    scheme?: TablurScheme;
-    padding?: number;
-    aligns?: TablurAlign | TablurAlign[];
-    sizes?: number | number[];
+    justify?: boolean;
+    gutter?: number;
+    shift?: boolean;
+    padding?: TablurPadding;
     border?: TablurBorder;
-    borderColor?: TablurColor;
+    borderColor?: TablurBorderColor;
     colorize?: boolean;
-}
-export interface ITablurOptions extends ITablurOptionsBase {
-    float?: TablurAlign;
-    borders?: ITablurMap<ITablurBorder>;
-    rows?: string[][] | ITablurColumn[][];
+    stringLength?: TablurStringLength;
 }

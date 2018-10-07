@@ -7,14 +7,14 @@ import * as chai from 'chai';
 import * as mocha from 'mocha';
 import * as fs from 'fs';
 
-import { TABLER_BORDERS, Tablur, TablurScheme, TablurBorder } from '../';
+import { Tablur, TablurBorder } from '../';
 import * as table from './example.spec';
 
 const expect = chai.expect;
 const should = chai.should;
 const assert = chai.assert;
 
-const full_test = fs.readFileSync('./src/test/full.txt', 'utf8');
+const example = fs.readFileSync('./src/test/full.txt', 'utf8').replace(/\n$/, '');
 
 describe('Tablur', () => {
 
@@ -22,29 +22,10 @@ describe('Tablur', () => {
     done();
   });
 
-  it('should read and example configuration and match values.', () => {
+  it('should read and example configuration and match.', () => {
     const str = table.toString();
-    assert.equal(str, full_test);
+    assert.equal(str, example);
   });
 
-  it('should clear existing rows.', () => {
-    table.clear();
-    assert.equal(0, table['_rows'].length);
-  });
-
-  it('should reset all options.', () => {
-    table.options.border = TablurBorder.round;
-    table.reset();
-    assert.notEqual(table.options.width, 80);
-    assert.notEqual(table.options.border, TablurBorder.round);
-  });
-
-  it('should create table and truncate text.', () => {
-    table.options.scheme = TablurScheme.truncate;
-    table.options.width = 25;
-    table.row('just some long string that we need to have truncated.');
-    const str = table.toString();
-    assert.equal(25, str.length);
-  });
 
 });

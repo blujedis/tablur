@@ -1,15 +1,73 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var ws = require("term-size");
-var wrapAnsi = require("wrap-ansi");
-var ansiWidth = require("string-width");
 var stripAnsi = require("strip-ansi");
+var wrapAnsi = require("wrap-ansi");
+var chek_1 = require("chek");
 var colurs_1 = require("colurs");
-var interfaces_1 = require("./interfaces");
-var colurs = new colurs_1.Colurs();
-var BASE_OPTIONS_KEYS = ['width', 'scheme', 'padding', 'sizes', 'border', 'borderColor'];
-exports.TABLER_BORDERS = {
-    'single': {
+var util_1 = require("util");
+var termSize = require("term-size");
+// HELPERS //
+function seedArray(len, def, seed) {
+    seed = seed || [];
+    def = def || 0;
+    if (chek_1.isValue(seed) && !Array.isArray(seed))
+        seed = [seed];
+    var arr = new Array(len).fill(def);
+    return arr.map(function (v, i) {
+        return seed[i] || v;
+    });
+}
+function toPadding(padding, def, seed) {
+    def = chek_1.isValue(def) ? def : [0, 0, 0, 0];
+    if (chek_1.isNumber(def))
+        def = seedArray(4, def);
+    if (!chek_1.isValue(padding))
+        padding = def;
+    if (chek_1.isNumber(padding))
+        padding = seedArray(4, padding);
+    padding = padding.map(function (v, i) {
+        v = seed ? seed[i] : v || 0;
+        if (chek_1.isString(v))
+            v = parseInt(v, 10);
+        return v;
+    });
+    return (padding || def);
+}
+function isDecimal(val) {
+    if (chek_1.isString(val))
+        val = parseInt(val, 10);
+    return (val % 1) !== 0;
+}
+function toContentWidth(width) {
+    var termWidth = termSize().columns;
+    if (width === 0)
+        width = termWidth;
+    if (isDecimal(width))
+        width = Math.round(termWidth * width);
+    return width;
+}
+function divide(val, by) {
+    var width = Math.max(0, Math.floor(val / by));
+    var remainder = Math.max(0, val % by);
+    return {
+        width: width,
+        remainder: remainder
+    };
+}
+// CONSTANTS //
+var DEFAULT_OPTIONS = {
+    stream: process.stdout,
+    width: undefined,
+    justify: true,
+    gutter: 2,
+    shift: false,
+    padding: [0, 0, 0, 0],
+    border: undefined,
+    borderColor: undefined,
+    stringLength: undefined
+};
+var BORDERS = {
+    single: {
         'topLeft': '┌',
         'topRight': '┐',
         'bottomRight': '┘',
@@ -17,7 +75,7 @@ exports.TABLER_BORDERS = {
         'vertical': '│',
         'horizontal': '─'
     },
-    'double': {
+    double: {
         'topLeft': '╔',
         'topRight': '╗',
         'bottomRight': '╝',
@@ -25,7 +83,7 @@ exports.TABLER_BORDERS = {
         'vertical': '║',
         'horizontal': '═'
     },
-    'round': {
+    round: {
         'topLeft': '╭',
         'topRight': '╮',
         'bottomRight': '╯',
@@ -33,7 +91,7 @@ exports.TABLER_BORDERS = {
         'vertical': '│',
         'horizontal': '─'
     },
-    'single-double': {
+    singleDouble: {
         'topLeft': '╓',
         'topRight': '╖',
         'bottomRight': '╜',
@@ -41,7 +99,7 @@ exports.TABLER_BORDERS = {
         'vertical': '║',
         'horizontal': '─'
     },
-    'double-single': {
+    doubleSingle: {
         'topLeft': '╒',
         'topRight': '╕',
         'bottomRight': '╛',
@@ -49,7 +107,7 @@ exports.TABLER_BORDERS = {
         'vertical': '│',
         'horizontal': '═'
     },
-    'classic': {
+    classic: {
         'topLeft': '+',
         'topRight': '+',
         'bottomRight': '+',
@@ -58,641 +116,508 @@ exports.TABLER_BORDERS = {
         'horizontal': '-'
     }
 };
-var DEFAULTS = {
-    width: ws().columns,
-    scheme: interfaces_1.TablurScheme.wrap,
-    padding: 2,
-    sizes: undefined,
-    borders: {},
-    rows: [] // rows to initialize with.
-};
+// CLASS //
 var Tablur = /** @class */ (function () {
-    function Tablur(options) {
-        this._rows = [];
-        this._indexed = {};
-        this.options = Object.assign({}, DEFAULTS, options);
-        this.init();
+    function Tablur(options, debug) {
+        this.rows = [];
+        this.init(options, debug);
     }
-    Tablur.prototype.init = function () {
-        // Merge in default borders.
-        this.options.borders = Object.assign({}, exports.TABLER_BORDERS, this.options.borders);
-        // Must have even number for borders.
-        if (this.options.border && this.options.padding % 2)
-            this.options.padding += 1;
-        // Set colorization.
-        colurs.setOption('enabled', this.options.colorize);
-        // Add rows that were passed in init.
-        this.rows(this.options.rows);
-    };
-    Object.defineProperty(Tablur.prototype, "size", {
-        // HELPERS //
-        /**
-         * Gets the size of the terminal columns and rows.
-         */
-        get: function () {
-            return ws();
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Tablur.prototype.sum = function (nums) {
-        return nums.reduce(function (a, c) { return a += c; });
-    };
-    Tablur.prototype.isBaseOptions = function (obj) {
-        if (typeof obj !== 'object')
-            return false;
-        var baseKey = Object.keys(obj)[0];
-        return ~BASE_OPTIONS_KEYS.indexOf(baseKey);
-    };
-    Tablur.prototype.findIndices = function (str, char) {
-        var arr = [];
-        var row = stripAnsi(str);
-        for (var i = 0; i < row.length; i++)
-            if (row[i] === char)
-                arr.push(i);
-        return arr;
-    };
-    Tablur.prototype.pad = function (str, width, align) {
-        if (align === void 0) { align = interfaces_1.TablurAlign.left; }
-        var adj = Math.max(0, width - ansiWidth(str));
-        var rem = '';
-        var pad = ' '.repeat(adj);
-        // adjust pad if centering is required.
-        if (align === interfaces_1.TablurAlign.center) {
-            rem = ' '.repeat(Math.max(0, adj % 2));
-            adj = (adj / 2);
-            pad = ' '.repeat(adj);
-            var x = (pad + str + pad + rem).length;
-            return pad + str + pad + rem;
+    Tablur.prototype.init = function (options, debug) {
+        if (chek_1.isBoolean(options)) {
+            debug = options;
+            options = undefined;
         }
-        if (align === interfaces_1.TablurAlign.right)
-            return pad + str;
-        return str + pad;
+        this.debug = debug;
+        this.options = options = Object.assign({}, DEFAULT_OPTIONS, options);
+        this.border = BORDERS[options.border];
+        if (this.options.borderColor)
+            this.options.colorize = true;
+        this.colurs = new colurs_1.Colurs({ enabled: this.options.colorize });
+        this.tokens = {
+            pad: debug ? this.colurs.blueBright('P') : ' ',
+            align: debug ? this.colurs.greenBright('A') : ' ',
+            indent: debug ? this.colurs.cyanBright('>') : ' ',
+            shift: debug ? this.colurs.magentaBright('S') : ' '
+        };
     };
-    Tablur.prototype.truncate = function (str, len) {
-        return str.slice(0, len - 3) + '...';
+    Tablur.prototype.pad = function (str, dir, width, char) {
+        if (char === void 0) { char = ' '; }
+        var len = this.stringLength(str);
+        if (len > width)
+            return str;
+        var baseOffset = Math.max(0, width - len);
+        if (dir === 'left')
+            return char.repeat(baseOffset) + str;
+        if (dir === 'right')
+            return str + char.repeat(baseOffset);
+        var div = divide(baseOffset, 2);
+        return char.repeat(div.width) + str + char.repeat(div.width) + char.repeat(div.remainder);
     };
-    Tablur.prototype.fillArray = function (count, val) {
-        if (val === void 0) { val = ''; }
-        return Array.from(new Array(Math.ceil(count)), function (__) { return val; });
-    };
-    Tablur.prototype.toPercentage = function (num, of, places) {
-        if (of === void 0) { of = 100; }
-        // check if is decimal using modulous.
-        num = num % 1 !== 0 ? num * of : num;
-        // to fixed if decimal places.
-        return places >= 0 ? parseFloat((num / of).toFixed(places)) : num / of;
-    };
-    Tablur.prototype.horizontalFill = function (width, char, endcap, offset) {
-        if (offset === void 0) { offset = 0; }
-        width = endcap ? (width - 2) + offset : width + offset;
-        var horiz = char.repeat(width);
-        if (endcap)
-            return endcap + horiz + endcap;
-        return horiz;
-    };
-    Tablur.prototype.toArray = function (val, def) {
-        if (def === void 0) { def = []; }
-        if (typeof val === undefined)
-            return def;
-        if (Array.isArray(val))
-            return val;
-        return [val];
-    };
-    // COLUMNS & LAYOUT //
-    Tablur.prototype.layoutWidth = function (width) {
-        return width || this.options.width || this.size.columns;
-    };
-    Tablur.prototype.toColumn = function (col) {
-        if (typeof col === 'string')
-            col = {
-                text: col
-            };
-        col.text = col.text || '';
-        col.size = col.size || 0;
-        col.configure = col.configure === false ? false : true;
-        col.length = ansiWidth(col.text);
-        col.adjusted = Math.max(col.size, col.length, 0);
-        return col;
-    };
-    Tablur.prototype.columnCounts = function (rows) {
-        return (rows || this._rows).reduce(function (a, r, i) {
-            var total = 0;
-            r.forEach(function (v, n) {
-                if (!v.configure)
-                    return;
-                a.columns[n] = Math.max(v.adjusted, a.columns[n] || 0, 0);
-                total += a.columns[n];
-            });
-            a.total = Math.max(total, a.total);
-            return a;
-        }, { columns: [], total: 0 });
-    };
-    Tablur.prototype.calculateOffset = function (columns, padding, border) {
-        return Math.max(0, !border
-            ? (columns - 1) * padding
-            : ((columns + 1) * padding) + (columns + 1));
-    };
-    Tablur.prototype.buildRow = function () {
+    // Shift text so that right or left
+    // aligned text doesn't have space
+    // at the boundary position.
+    Tablur.prototype.shiftLine = function (text, align) {
         var _this = this;
-        var cols = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            cols[_i] = arguments[_i];
+        var exp = align === 'right' ? /\s+$/ : /^\s+/;
+        if (align === 'center' || !exp.test(text))
+            return text;
+        var matches = (text.match(exp) || []).map(function (v) { return _this.tokens.shift; });
+        // Add one so that join works.
+        if (matches.length)
+            matches.push(matches[0]);
+        text = text.replace(exp, '');
+        if (align === 'left')
+            return (text += matches.join(''));
+        return matches.join('') + text;
+    };
+    Tablur.prototype.stringLength = function (str) {
+        var fn = this.options.stringLength || function (s) {
+            s = stripAnsi(s);
+            s = s.replace(/\n/g, '');
+            return s.length;
+        };
+        return fn(str);
+    };
+    Tablur.prototype.padLeft = function (str, width, char) {
+        return this.pad(str, 'left', width, char);
+    };
+    Tablur.prototype.padCenter = function (str, width, char) {
+        return this.pad(str, 'center', width, char);
+    };
+    Tablur.prototype.padRight = function (str, width, char) {
+        return this.pad(str, 'right', width, char);
+    };
+    Tablur.prototype.getBorders = function (width, border) {
+        var _border = border;
+        if (chek_1.isString(border))
+            _border = BORDERS[border];
+        if (!_border)
+            return undefined;
+        var bdr = this.border;
+        var top = bdr.topLeft + bdr.horizontal.repeat(width - 2) + bdr.topRight;
+        var horizontal = bdr.vertical + bdr.horizontal.repeat(width - 2) + bdr.vertical;
+        var bottom = bdr.bottomLeft + bdr.horizontal.repeat(width - 2) + bdr.bottomRight;
+        if (this.options.borderColor) {
+            top = this.colurs.applyAnsi(top, this.options.borderColor);
+            horizontal = this.colurs.applyAnsi(horizontal, this.options.borderColor);
+            bottom = this.colurs.applyAnsi(bottom, this.options.borderColor);
         }
-        var sizes = this.toArray(this.options.sizes);
-        var aligns = this.toArray(this.options.aligns);
-        return cols.map(function (c, i) {
-            c = _this.toColumn(c);
-            if (c.configure) { // ignore non configurable columns like sections & breaks.
-                var size = sizes[i] || sizes[0] || 0;
-                c.adjusted = Math.max(c.adjusted, size);
-                var align = aligns[i] || aligns[0] || interfaces_1.TablurAlign.left;
-                c.align = c.align || align;
+        return {
+            top: top,
+            bottom: bottom,
+            horizontal: horizontal
+        };
+    };
+    Tablur.prototype.getMaxRow = function (rows, widthOnly) {
+        var _this = this;
+        var _rows = rows;
+        if (!Array.isArray(rows[0]))
+            _rows = [_rows];
+        // Ensure gutter divisible by 2.
+        var gutter = Math.max(0, Math.floor(this.options.gutter / 2)) * 2;
+        var totals = _rows.reduce(function (result, columns, n) {
+            var curCount = columns.length;
+            columns.forEach(function (col, i) {
+                var len = (col.width || _this.stringLength(col.text));
+                if (!widthOnly) {
+                    len += col.indent;
+                    len += (col.padding[1] + col.padding[3]);
+                }
+                result.columns[i] = result.columns[i] || 0;
+                result.columns[i] = len > result.columns[i] ? len : result.columns[i];
+            });
+            var adj = 0;
+            if (!widthOnly) {
+                // Add gutter.
+                if (columns.length > 1)
+                    adj += (gutter * (columns.length - 1));
+                // Add border.
+                if (_this.options.border)
+                    adj += ((columns.length - 1) + 2);
             }
+            result.adjustment = adj > result.adjustment ? adj : result.adjustment;
+            result.count = curCount > result.count ? curCount : result.count;
+            return result;
+        }, { width: 0, adjustment: 0, count: 0, columns: [] });
+        totals.width = totals.columns.reduce(function (a, c) { return a + c; }, 0) + totals.adjustment;
+        return totals;
+    };
+    Tablur.prototype.normalize = function (text, width, align, padding) {
+        if (chek_1.isString(width)) {
+            padding = align;
+            align = width;
+            width = undefined;
+        }
+        if (chek_1.isNumber(align)) {
+            padding = align;
+            align = undefined;
+        }
+        var colDefaults = {
+            align: 'left',
+            shift: this.options.shift,
+            padding: this.options.padding,
+            indent: 0
+        };
+        var globalOpts = chek_1.isObject(width) ? Object.assign({}, colDefaults, width) : undefined;
+        width = chek_1.isNumber(width) ? width : undefined;
+        align = align || 'left';
+        if (!Array.isArray(text)) {
+            // Convert to column object.
+            if (!chek_1.isObject(text)) {
+                text = {
+                    text: text,
+                    align: align,
+                    width: width,
+                    padding: padding
+                };
+            }
+            // Single column config passed.
+            text = [text];
+        }
+        var cols = text;
+        return cols.map(function (c, i) {
+            if (chek_1.isString(c)) {
+                var str = c;
+                var parts = str.split('|').map(function (v) {
+                    if (v === 'null' || v === 'undefined')
+                        return undefined;
+                    return v;
+                });
+                // allow shorthand config:
+                // text|width|align|padding OR text|align|padding
+                // for padding split with : for top, right, bottom, left.
+                if (parts[1] && chek_1.includes(['left', 'right', 'center', 'none'], parts[1]))
+                    parts = [parts[0], undefined].concat(parts.slice(1));
+                if (parts[3]) {
+                    if (~parts[3].indexOf(':'))
+                        parts[3] = parts[3].split(':').map(function (v) { return parseInt(v, 10); });
+                    else
+                        parts[3] = parseInt(parts[3], 10);
+                    parts[3] = seedArray(4, 0, parts[3]);
+                }
+                parts[1] = chek_1.isString(parts[1]) ? parseInt(parts[1], 10) : parts[1];
+                if (parts.length > 1) {
+                    c = {
+                        text: parts[0],
+                        width: parts[1],
+                        align: parts[2],
+                        padding: parts[3]
+                    };
+                }
+                else {
+                    c = {
+                        text: c
+                    };
+                }
+            }
+            else if (!chek_1.isPlainObject(c)) {
+                c = {
+                    text: c
+                };
+            }
+            // Ensure text is string.
+            // Don't colorize user should do
+            // so if that is desired.
+            if (!chek_1.isString(c.text))
+                c.text = util_1.inspect(c.text, undefined, undefined, false);
+            c = Object.assign({}, colDefaults, c, globalOpts);
+            c.align = c.align || 'left';
+            c.padding = toPadding(c.padding, padding);
+            c.isRow = true;
             return c;
         });
     };
-    // RENDERING & CONFIGURATION //
-    Tablur.prototype.renderColumnsAdjust = function (pconfig, config) {
+    Tablur.prototype.columnize = function (cols, maxWidth, maxColumns) {
         var _this = this;
-        // If the same number of columns just match column widths.
-        if (pconfig.columns.length === config.columns.length) {
-            var cols = void 0;
-            // Get the optimal widths based on main table
-            // width divided by the footer's column count.
-            var colWidths = Math.floor(config.total / pconfig.columns.length);
-            // Get the remainder if any.
-            var colRem = config.total % pconfig.columns.length;
-            cols = this.fillArray(pconfig.columns.length, colWidths);
-            // Add any remainder to last column
-            if (colRem)
-                cols[cols.length - 1] = cols[cols.length - 1] + (colRem || 0);
-            pconfig.columns = cols;
-        }
-        // If not same column count calculate percentages
-        // to respect user defined dimensions.
-        else {
-            // Map current col vals to percentages of width so we
-            // can maintain aspect ratio.
-            pconfig.columns = pconfig.columns.map(function (v) { return Math.floor(_this.toPercentage(v, pconfig.total) * config.total); });
-            // We need to ensure the columns are the same total length.
-            var adjusted = Math.max(0, config.total - this.sum(pconfig.columns));
-            // Add any adjustment so our totals match.
-            pconfig.columns[pconfig.columns.length - 1] = pconfig.columns[pconfig.columns.length - 1] + adjusted;
-        }
-        pconfig.total = config.total;
-        pconfig.adjustedLayout = config.adjustedLayout;
-        pconfig.layout = config.layout;
-        pconfig.adjustment = config.adjustment;
-        pconfig.remainder = config.remainder;
-        return pconfig;
-    };
-    Tablur.prototype.renderHeader = function (rows, config) {
-        var pconfig = this.renderColumnsAdjust(this._header.columnCounts(), config);
-        var bdr = this.options.borders[this.options.border];
-        var header = this._header.render(pconfig);
-        var fillCount = Math.round(this._header.options.padding / 2);
-        var boxFill = this.wrap(config.layout, fillCount, this.options.border);
-        var isNextBreak = this._indexed[0];
-        if (this._header.options.border) {
-            var btmBorder = [this.horizontalFill(config.layout, bdr.horizontal, bdr.vertical)];
-            if (!isNextBreak)
-                header = header.slice(0, header.length - 1);
-            else
-                btmBorder = [];
-            header = header.concat(btmBorder);
-        }
-        else {
-            header = header.concat(boxFill.fill, [boxFill.top]);
-        }
-        // Add the header to the rows.
-        return header.concat(rows);
-    };
-    Tablur.prototype.renderFooter = function (rows, config) {
-        // Parse the footer columns.
-        var pconfig = this.renderColumnsAdjust(this._footer.columnCounts(), config);
-        var bdr = this.options.borders[this.options.border];
-        var fillCount = Math.round(this._footer.options.padding / 2);
-        var boxFill = this.wrap(config.layout, fillCount, this.options.border);
-        var isPrevBreak = this._indexed[this._rows.length - 1];
-        var footer = this._footer.render(pconfig);
-        if (this._footer.options.border) {
-            var topBorder = [this.horizontalFill(config.layout, bdr.horizontal, bdr.vertical)];
-            if (!isPrevBreak)
-                footer = footer.slice(1);
-            else
-                topBorder = [];
-            footer = topBorder.concat(footer);
-        }
-        else {
-            footer = [boxFill.bottom].concat(boxFill.fill, footer, boxFill.fill);
-        }
-        return rows.concat(footer);
-    };
-    /**
-    * Wrap creates border wrap and builds fill rows for padding.
-    *
-    * @example .wrap(75, 3, TablerBorder.round, [0, 12, 40]);
-    *
-    * @param width the width of the element to border wrap.
-    * @param fill the fill count for padding.
-    * @param border the border to use.
-    * @param indices indices to match bordering for fill rows.
-    */
-    Tablur.prototype.wrap = function (width, fill, border, indices) {
-        var bdr = this.options.borders[border];
-        bdr = bdr || {
-            topLeft: '',
-            topRight: '',
-            bottomLeft: '',
-            bottomRight: '',
-            horizontal: '',
-            vertical: ''
+        var result = [];
+        var resultPad = [];
+        var alignMap = {
+            left: this.padRight.bind(this),
+            right: this.padLeft.bind(this),
+            center: this.padCenter.bind(this),
+            none: function (v, w) { return v; }
         };
-        var baseFill = this.horizontalFill(width, bdr.horizontal, null, -2);
-        var horizFill = this.horizontalFill(width, ' ', bdr.vertical);
-        if (indices && indices.length) {
-            indices.forEach(function (v) {
-                horizFill = horizFill.slice(0, v) + bdr.vertical + horizFill.slice(v + 1);
+        var colLen = cols.length - 1;
+        // Get the widest content width.
+        var contentWidth = this.getMaxRow(cols, true).width;
+        // Gutter must be divisible by two
+        // in order to work with borders.
+        var gutter = Math.max(0, Math.floor(this.options.gutter / 2));
+        var gutterLen = (gutter * 2) * colLen;
+        // Acount for inner borders wrapped in spaces
+        var borderLen = this.border ? colLen + 2 : 0;
+        // Check for border and colorize.
+        var vertBdr = this.options.border ? this.border.vertical : '';
+        vertBdr = this.options.borderColor ? this.colurs.applyAnsi(vertBdr, this.options.borderColor) : vertBdr;
+        // Define the gutter string for joining columns.
+        var gutterStr = !gutter ? '' : ' '.repeat(gutter * 2);
+        gutterStr = borderLen ? ' '.repeat(gutter) + vertBdr + ' '.repeat(gutter) : gutterStr;
+        // If static row ignore gutter and border.
+        if (cols.length === 1 && cols[0].borders === false) {
+            gutterLen = 0;
+            borderLen = 0;
+        }
+        // The max width available less the gutter and border lengths.
+        var adjWidth = maxWidth - gutterLen - borderLen;
+        // The column adjustment if content is less than total width.
+        var colAdjust = Math.max(0, adjWidth - contentWidth);
+        // The width to be added to each column.
+        var colDiv = divide(colAdjust, cols.length);
+        var colRemainDiv = divide(colDiv.remainder, cols.length);
+        var remainingWidth = adjWidth;
+        var remainingCols = cols.length;
+        var maxLines = [];
+        var normalized = {};
+        var lastCol = cols.length - 1;
+        cols.forEach(function (c, i) {
+            var str;
+            var colWidth;
+            var char = c.isRepeat ? c.text : null;
+            var padding = c.padding[1] + c.padding[3];
+            var indent = c.indent || 0;
+            str = char ? '' : c.text || '';
+            // Rows are inner row items that are
+            // NOT a break, section or repeat.
+            if (c.isRow) {
+                if (!chek_1.isValue(c.width)) {
+                    if (_this.options.width === 0)
+                        c.width = 0;
+                    else if (_this.options.justify)
+                        c.width = maxColumns[i];
+                }
+            }
+            // Auto size column.
+            if (c.width === 0) {
+                var div = divide(remainingWidth, remainingCols);
+                var remainder = divide(div.remainder, remainingCols);
+                colWidth = div.width;
+                colWidth = (colWidth + remainder.width) + (i === 0 ? remainder.remainder : 0);
+            }
+            // Define with by static value or with of content.
+            else {
+                var colContentWidth = _this.stringLength(c.text); // + (colDiv.width + colRemainDiv.width);
+                colWidth = c.width || colContentWidth;
+                colWidth = i === lastCol ? colWidth + colRemainDiv.remainder : colWidth;
+                if (colWidth < remainingWidth && i === lastCol)
+                    colWidth = remainingWidth;
+                if (colWidth > remainingWidth)
+                    colWidth = remainingWidth;
+            }
+            remainingWidth -= colWidth;
+            remainingCols -= 1;
+            var innerWidth = colWidth - padding - indent;
+            var config = Object.assign({}, c);
+            config.width = colWidth;
+            config.innerWidth = innerWidth;
+            if (c.isRepeat) {
+                var rptDiv = divide(innerWidth, c.text.length);
+                str = c.text.repeat(rptDiv.width);
+                if (rptDiv.remainder)
+                    str = (c.text.charAt(0).repeat(rptDiv.remainder));
+            }
+            else {
+                if (_this.stringLength(str) > innerWidth)
+                    str = wrapAnsi(str, innerWidth, { hard: true, trim: false });
+            }
+            config.textArray = str.split('\n');
+            config.lines = str.match(/\n/g) || [];
+            config.borders = c.borders;
+            normalized[i] = config;
+            if (config.lines.length > maxLines.length)
+                maxLines = config.lines;
+        });
+        var map = {};
+        var normalizedKeys = Object.keys(normalized);
+        var firstKey = chek_1.first(normalizedKeys);
+        var lastKey = chek_1.last(normalizedKeys);
+        normalizedKeys.forEach(function (k, n) {
+            var config = normalized[k];
+            // If not enough lines extend to match
+            // the total required lines.
+            if (config.lines.length < maxLines.length) {
+                var adj = maxLines.slice(0, maxLines.length - config.lines.length).map(function (v) { return ''; });
+                config.textArray = config.textArray.concat(adj);
+            }
+            // Build up row used for padding.
+            var buildPadRow = _this.tokens.pad.repeat(config.width);
+            // Inspect if pad row requires borders.
+            if (_this.border && config.borders !== false) {
+                if (k === firstKey)
+                    buildPadRow = vertBdr + buildPadRow;
+                if (k === lastKey)
+                    buildPadRow += vertBdr;
+                resultPad.push(buildPadRow);
+            }
+            // Iterate each line building borders and padding.
+            config.textArray.forEach(function (line, index) {
+                if (config.shift)
+                    line = _this.shiftLine(line, config.align);
+                if (config.padding)
+                    line = _this.tokens.pad.repeat(config.padding[1]) + line + _this.tokens.pad.repeat(config.padding[3]);
+                if (config.indent)
+                    line = _this.tokens.indent.repeat(config.indent) + line;
+                line = config.align ? alignMap[config.align](line, config.width, _this.tokens.align) : line;
+                if (_this.border && config.borders !== false) {
+                    var vertical = _this.border.vertical;
+                    if (_this.options.borderColor)
+                        vertical = _this.colurs.applyAnsi(vertical, _this.options.borderColor);
+                    if (k === firstKey)
+                        line = vertical + line;
+                    if (k === lastKey)
+                        line += vertical;
+                }
+                map[index] = map[index] || [];
+                map[index] = map[index].concat([line]);
             });
+        });
+        for (var i in map) {
+            var row = map[i];
+            result.push(row.join(gutterStr));
         }
-        horizFill = this.fillArray(fill, horizFill);
+        var padRow = resultPad.length ? resultPad.join(gutterStr) : '';
         return {
-            top: bdr.topLeft + baseFill + bdr.topRight,
-            bottom: bdr.bottomLeft + baseFill + bdr.bottomRight,
-            fill: horizFill
+            row: result.join('\n'),
+            padRow: padRow
         };
     };
-    // API //
-    /**
-     *
-     * @param str a string to be colorized.
-     * @param styles
-     */
-    Tablur.prototype.colorize = function (str, styles) {
-        styles = styles || this.options.borderColor;
-        if (!styles)
-            return str;
-        if (!Array.isArray(styles))
-            styles = [styles];
-        return colurs.applyAnsi(str, styles);
-    };
-    Tablur.prototype.header = function () {
-        var _this = this;
-        var cols = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            cols[_i] = arguments[_i];
-        }
-        var _a;
-        var options = {};
-        // Check if options object.
-        if (this.isBaseOptions(cols[cols.length - 1])) {
-            options = cols[cols.length - 1];
-            cols = cols.slice(0, cols.length - 2);
-        }
-        var align;
-        if (interfaces_1.TablurAlign[cols[1]]) {
-            align = cols[1];
-            cols = cols.slice(0, 1).concat(cols.slice(2));
-            if (typeof cols[0] === 'string') {
-                cols[0] = {
-                    text: cols[0],
-                    align: align
-                };
-            }
-        }
-        options = Object.assign({}, this.options, options);
-        this._header = new Tablur(options);
-        (_a = this._header).row.apply(_a, cols.map(function (n) { return _this.toColumn(n); }));
+    Tablur.prototype.row = function (text, width, align, padding) {
+        var self = this;
+        var normalized = this.normalize(text, width, align, padding);
+        this.rows.push(normalized);
         return this;
     };
-    Tablur.prototype.footer = function () {
-        var _this = this;
-        var cols = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            cols[_i] = arguments[_i];
+    Tablur.prototype.section = function (text, align, padding) {
+        var obj = text;
+        if (chek_1.isNumber(align) || Array.isArray(align)) {
+            padding = align;
+            align = undefined;
         }
-        var _a;
-        var options = {};
-        // Check if options object.
-        if (this.isBaseOptions(cols[cols.length - 1])) {
-            options = cols[cols.length - 1];
-            cols = cols.slice(0, cols.length - 2);
-        }
-        var align;
-        if (interfaces_1.TablurAlign[cols[1]]) {
-            align = cols[1];
-            cols = cols.slice(0, 1).concat(cols.slice(2));
-            if (typeof cols[0] === 'string') {
-                cols[0] = {
-                    text: cols[0],
-                    align: align
-                };
-            }
-        }
-        options = Object.assign({}, this.options, options);
-        this._footer = new Tablur(options);
-        (_a = this._footer).row.apply(_a, cols.map(function (n) { return _this.toColumn(n); }));
-        return this;
-    };
-    /**
-     * Adds a new row to the instance.
-     *
-     * @example .row('column 1', { text: 'column 2' });
-     *
-     * @param cols the columns of the row to be added.
-     */
-    Tablur.prototype.row = function () {
-        var cols = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            cols[_i] = arguments[_i];
-        }
-        if (!cols.length)
-            return;
-        this._rows = this._rows.concat([this.buildRow.apply(this, cols)]);
-        return this;
-    };
-    /**
-     * Adds multiple rows containing table columns.
-     *
-     * @example .rows([ ['row1-col1], [{ text: 'row2-col1 }] ]);
-     *
-     * @param rows the rows of table columns to add.
-     */
-    Tablur.prototype.rows = function (rows) {
-        var _this = this;
-        rows.forEach(function (v) { return _this.row.apply(_this, v); });
-        return this;
-    };
-    /**
-     * Creates an empty break in the table.
-     *
-     * @example .break();
-     */
-    Tablur.prototype.break = function () {
-        this._indexed[this._rows.length] = 1;
-        this.row({ text: '', configure: false });
-        return this;
-    };
-    Tablur.prototype.section = function (name, align) {
-        if (typeof name === 'string') {
-            name = {
-                text: name
+        if (chek_1.isNumber(padding))
+            padding = [padding, padding, padding, padding];
+        align = align || 'left';
+        padding = padding || seedArray(4, 0);
+        if (!chek_1.isObject(text)) {
+            obj = {
+                text: text,
+                align: align
             };
+            obj.padding = padding;
         }
-        this._indexed[this._rows.length] = 2;
-        name.configure = false;
-        name.align = align;
-        this.row(name);
+        obj.align = obj.align || align;
+        obj.padding = toPadding(obj.padding);
+        obj.isSection = true;
+        obj.borders = !chek_1.isValue(obj.borders) ? false : obj.borders;
+        // if (obj.borders && !obj.align)
+        //   obj.align = 'left';
+        this.rows.push([obj]);
         return this;
     };
-    /**
-     * Configures rows for output adjusting and normalizing cells.
-     *
-     * @example .configure({ // optional parent config });
-     *
-     * @param config optional parent configuration to override with.
-     */
-    Tablur.prototype.configure = function (config) {
-        var _this = this;
-        // Get layout width and get max columns and adjusted widths.
-        var layoutWidth = this.layoutWidth();
-        config = config || this.columnCounts(this._rows);
-        config.layout = layoutWidth;
-        config.lines = {};
-        var colCount = config.columns.length;
-        var offset = this.calculateOffset(colCount, this.options.padding, !!this.options.border);
-        config.adjustedLayout = (layoutWidth - offset);
-        var adjTotal = config.total, adjWidth = config.adjustedLayout, adjNeg = true;
-        // Layout width is too narrow.
-        if (config.adjustedLayout > config.total) {
-            adjTotal = config.adjustedLayout;
-            adjWidth = config.total;
-            adjNeg = false;
+    Tablur.prototype.repeat = function (text, align, padding) {
+        var obj = text;
+        if (chek_1.isNumber(align) || Array.isArray(align)) {
+            padding = align;
+            align = undefined;
         }
-        config.adjustment = Math.max(0, Math.floor(((adjTotal - adjWidth) / colCount)));
-        config.remainder = Math.max(0, (adjTotal - adjWidth) % colCount);
-        if (adjNeg) {
-            config.adjustment = -Math.abs(config.adjustment);
-            config.remainder = -Math.abs(config.remainder);
+        if (chek_1.isNumber(padding))
+            padding = [padding, padding, padding, padding];
+        align = align || 'left';
+        padding = padding || seedArray(4, 0);
+        if (!chek_1.isObject(text)) {
+            obj = {
+                text: text,
+                align: align
+            };
+            obj.padding = padding;
         }
-        this._rows = config.rows = this._rows.map(function (row, i) {
-            // Ensure same length of columns
-            // unless empty or section header.
-            if (row.length < colCount && row[0].configure) {
-                row = row.concat(_this.fillArray(colCount - row.length, { text: '', width: 0, length: 0, adjusted: 0 }));
-            }
-            var remainder = Math.abs(config.remainder);
-            var decrementer = Math.ceil(remainder / colCount);
-            return row.reduce(function (accum, col, n) {
-                if (col.configure) {
-                    // update adjusted with parsed width.
-                    col.adjusted = config.columns[n];
-                    // Subtract any adjustment.
-                    col.adjusted += config.adjustment;
-                    // If any remainder lop it off the widest column.
-                    if (remainder) {
-                        col.adjusted += adjNeg ? -decrementer : decrementer;
-                        remainder -= decrementer;
-                    }
-                }
-                // Empty & Section columns are simply the layout width.
-                else {
-                    col.adjusted = config.layout;
-                    if (_this.options.border)
-                        col.adjusted -= 2; // add a tiny bit of extra padding.
-                }
-                // Text too long should be wrapped to next line.
-                if (_this.options.scheme === interfaces_1.TablurScheme.wrap && col.length > col.adjusted)
-                    col.text = wrapAnsi(col.text, col.adjusted, { hard: true });
-                // overlengthed text should be truncated.
-                else if (_this.options.scheme === interfaces_1.TablurScheme.truncate)
-                    col.text = _this.truncate(col.text, col.adjusted);
-                // Split text into lines.
-                col.lines = col.text.split('\n');
-                // Update the line count.
-                config.lines[i] = Math.max(config.lines[i] || 0, col.lines.length);
-                accum = accum.concat([col]);
-                return accum;
-            }, []);
-        }, this);
-        return config;
+        obj.shift = false;
+        obj.padding = toPadding(obj.padding);
+        obj.isRepeat = true;
+        obj.borders = !chek_1.isValue(obj.borders) ? false : obj.borders;
+        this.rows.push([obj]);
+        return this;
     };
-    /**
-     * Render the rows into array of strings.
-     *
-     * @example .render({ // optional parent config });
-     *
-     * @param pconfig the parent's parsed column metadata.
-     */
-    Tablur.prototype.render = function (pconfig) {
+    Tablur.prototype.break = function () {
+        this.rows.push([{
+                text: '',
+                indent: 0,
+                borders: false,
+                shift: false,
+                padding: [0, 0, 0, 0]
+            }]);
+        return this;
+    };
+    Tablur.prototype.build = function (rows, width) {
         var _this = this;
-        if (!this._rows.length)
-            return [];
-        var config = this.configure(pconfig);
-        var options = this.options;
-        var padding = options.padding ? ' '.repeat(options.padding) : '';
-        var joinGutter = padding;
-        var border = options.borders[options.border];
-        // let actualWidth;
-        if (border) {
-            var borderGutterRepeat = Math.max(0, options.padding / 2);
-            var borderGutter = options.padding && borderGutterRepeat
-                ? ' '.repeat(borderGutterRepeat)
-                : '';
-            joinGutter = borderGutter + border.vertical + borderGutter;
+        if (chek_1.isNumber(rows)) {
+            width = rows;
+            rows = undefined;
         }
-        // Iterate rows building lines.
-        var rows = config.rows.reduce(function (a, c, i) {
-            return a.concat([c.reduce(function (res, col, n) {
-                    // Ensure same line count when multiline wrap.
-                    if (col.lines.length < config.lines[i] && col.configure)
-                        col.lines = col.lines.concat(_this.fillArray(config.lines[i] - col.lines.length));
-                    // Map wrapped multilines to correct row/col.
-                    col.lines.forEach(function (l, x) {
-                        res[x] = res[x] || [];
-                        var val = _this.pad(l, col.adjusted, col.align);
-                        var colLen = config.columns.length;
-                        // Handled bordered tables.
-                        if (border && col.configure && (n === 0 || n === (colLen - 1))) {
-                            res[x][n] = n !== 0
-                                ? val + padding + border.vertical
-                                : colLen === 1
-                                    ? border.vertical + padding + val + padding + border.vertical
-                                    : border.vertical + padding + val;
-                        }
-                        else if (!col.configure) {
-                            var pad = _this.options.border ? ' ' : '';
-                            res[x][n] = pad + val + pad;
-                        }
-                        // Non bordered table.
-                        else {
-                            res[x][n] = val;
-                        }
-                    });
-                    return res;
-                }, []).map(function (c) { return c.join(joinGutter); }).join('\n')]);
-        }, []);
-        var horizBorderRow;
-        var fillPad = Math.round(options.padding / 2);
-        if (border) {
-            horizBorderRow = this.horizontalFill(config.layout, border.horizontal, border.vertical);
-            var boxWrap_1 = this.wrap(config.layout, fillPad, options.border, this.findIndices(stripAnsi(rows[0].split('\n')[0]), border.vertical));
-            // Override fill if not greater than 1.
-            if (!(fillPad > 1))
-                boxWrap_1.fill = [];
-            var rowFill_1 = boxWrap_1.fill.concat([horizBorderRow], boxWrap_1.fill);
-            rows = rows.reduce(function (a, c, i, arr) {
-                var curFill = rowFill_1;
-                if (_this._indexed[i] > 0) {
-                    if (_this._indexed[i + 1])
-                        curFill = [];
-                    else
-                        curFill = [boxWrap_1.top].concat(boxWrap_1.fill);
+        rows = rows || this.rows;
+        var _rows = rows;
+        if (!Array.isArray(rows[0]))
+            _rows = [_rows];
+        var max = this.getMaxRow(_rows);
+        var maxWidth = width || max.width;
+        var borders = this.getBorders(maxWidth, this.options.border);
+        var columnized = _rows.reduce(function (a, c, i) {
+            var hasBorders = borders && c[0].borders !== false;
+            var padTop = c[0].padding[0];
+            var padBtm = c[0].padding[2];
+            var renderedCol = _this.columnize(c, maxWidth, max.columns);
+            var arr = [];
+            if (hasBorders && i === 0)
+                arr.push(borders.top);
+            if (padTop) {
+                arr = arr.concat(seedArray(padTop, renderedCol.padRow));
+            }
+            arr.push(renderedCol.row);
+            if (padBtm) {
+                arr = arr.concat(seedArray(padBtm, renderedCol.padRow));
+            }
+            var curr = c[0];
+            var prev = (_rows[i - 1] && _rows[i - 1][0]) || {};
+            var next = (_rows[i + 1] && _rows[i + 1][0]) || {};
+            if (borders && _rows.length > 1 && (i < (_rows.length - 1))) {
+                if (next.borders === false && curr.borders !== false)
+                    arr.push(borders.bottom);
+                else if (c[0].borders === false && next.borders !== false)
+                    arr.push(borders.top);
+                else if (curr.borders !== false)
+                    arr.push(borders.horizontal);
+            }
+            else if (borders) {
+                if (i === 0 && c[0].borders !== false) {
+                    if (_rows.length === 1)
+                        arr.push(borders.bottom);
                 }
-                else if (arr[i + 1] && _this._indexed[i + 1] > 0)
-                    curFill = boxWrap_1.fill.concat([boxWrap_1.bottom]);
-                if (i !== rows.length - 1)
-                    a = a.concat([c], curFill);
-                else
-                    a = a.concat([c], boxWrap_1.fill);
-                return a;
-            }, boxWrap_1.fill.slice());
-            if (!this._header && !this._indexed[0])
-                rows = [boxWrap_1.top].concat(rows);
-            if (!this._footer && !this._indexed[rows.length - 1])
-                rows = rows.concat([boxWrap_1.bottom]);
-        }
-        else {
-            var rowFill_2 = this.fillArray(fillPad, this.horizontalFill(config.layout, ' '));
-            rows = rows.reduce(function (a, c, i, arr) {
-                var curFill = rowFill_2;
-                if (_this._indexed[i] > 0)
-                    curFill = [];
-                else if (arr[i + 1] && _this._indexed[i + 1] > 0)
-                    curFill = rowFill_2[0] || [];
-                if (i !== rows.length - 1)
-                    a = a.concat([c], curFill);
-                else
-                    a = a.concat([c]);
-                return a;
-            }, []);
-        }
-        // Render the header if present.
-        if (this._header)
-            rows = this.renderHeader(rows, config);
-        // Render the footer if present.
-        if (this._footer)
-            rows = this.renderFooter(rows, config);
-        return rows;
+                else if (i === _rows.length - 1 && c[0].borders !== false) {
+                    arr.push(borders.bottom);
+                }
+            }
+            return a.concat(arr);
+        }, []);
+        return columnized;
     };
     Tablur.prototype.toString = function () {
-        return this.render().join('\n');
+        var width = toContentWidth(this.options.width);
+        return this.build(width).join('\n');
     };
-    /**
-     * Writes table to output stream with optional wrapping.
-     * By default tables are wrapped with empty lines. Set to
-     * null to disable.
-     *
-     * @example .write();
-     * @example .write(process.stderr);
-     * @example .write('-------------------------------');
-     *
-     * @param wrap when true wrap with char repeated on top and bottom.
-     * @param stream optional NodeJS.Writeable stream to output to.
-     */
-    Tablur.prototype.write = function (wrap, stream) {
-        var _this = this;
-        if (wrap === void 0) { wrap = ' '; }
-        if (stream === void 0) { stream = process.stdout; }
-        if (!this._rows.length)
-            return;
-        var rendered = this.render();
-        if (typeof wrap === 'object') {
-            stream = wrap;
-            wrap = undefined;
-        }
-        wrap = '';
-        if (wrap) {
-            var len = stripAnsi(rendered[0]).length;
-            var isNewLine = /[\n]/.test(wrap);
-            // Don't repeat simple new lines.
-            if (wrap === '' || /[\n]/.test(wrap)) {
-                rendered = [''].concat(rendered, ['']);
-            }
-            // Repeat the provided string.
-            else if (wrap && typeof wrap === 'string') {
-                wrap = wrap.repeat(len);
-                rendered = [wrap].concat(rendered, [wrap]);
-            }
-        }
-        var result = rendered.join('\n');
-        var border = this.options.borders[this.options.border];
-        var borders;
-        if (border && this.options.borderColor) {
-            borders = Object.keys(this.options.borders[this.options.border]).map(function (k) { return exports.TABLER_BORDERS.round[k]; }).join('|');
-            result = result.replace(new RegExp('(' + borders + ')', 'g'), function (s) { return _this.colorize(s, _this.options.borderColor); });
-        }
-        stream.write(result + '\n');
-    };
-    /**
-     * Clears all current rows.
-     */
-    Tablur.prototype.clear = function () {
-        this._rows = [];
+    Tablur.prototype.render = function (wrap) {
+        var str = this.toString();
+        if (wrap)
+            str = '\n' + str + '\n';
+        this.options.stream.write(str + '\n');
         return this;
     };
-    /**
-     * Reset all rows and options.
-     *
-     * @param options pass new options.
-     */
-    Tablur.prototype.reset = function (options) {
-        this.clear();
-        this.options = Object.assign({}, DEFAULTS, options);
-        this._header = undefined;
-        this._footer = undefined;
-        this.init();
+    Tablur.prototype.clear = function () {
+        this.rows = [];
+        return this;
+    };
+    Tablur.prototype.reset = function (options, debug) {
+        options = options || this.options;
+        this
+            .clear()
+            .init(options, debug);
         return this;
     };
     return Tablur;

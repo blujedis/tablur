@@ -12,16 +12,44 @@ $ npm install tablur
 
 ## Usage
 
-Tablur is similar in syntax to cliui if you've used it before. There's nothing complicated about it. The main difference is that Tablur is a little quicker than cliui and it's more versatile when it comes to adding sections.
+Tablur is similar to other CLI table utilities. You can configure using strings or objects for more control. Tablur also has a handy shorthand syntax that's a little easier to look at than using multiple objects for columns.
 
 ```ts
-const table = new Tablur({ width: 80 });
-table.header('My App');
-table.row('column 1', 'column 2', 'column3');
-table.break(); // <-- adds an empty line break.
-table.section('Sub Title'); // <-- adds a section header.
-table.row('column 1', 'column 2'); // <-- 3rd col will be added as empty column.
-table.footer('copyright 2018 my company');
+const table = new Tablur();
+
+table
+  .section('Tablur CLI Tables', 'center')
+
+  .break()
+
+  .row([
+    { text: 'app run --dev' },
+    { text: 'Runs the app.' },
+    { text: 'Alias: r', align: 'right' }])
+
+  .row(
+    [{ text: 'app create <name>' },
+    { text: 'Creates an app.' },
+    { text: 'Alias: c', align: 'right' }])
+
+  .break()
+
+  .section('Options:\n', 'left')
+
+  .row(
+    [{ text: ' <name>' },
+    { text: 'App name to create.' },
+    { text: '[string] [required]', align: 'right' }])
+
+  .row(
+    [{ text: ' --dev, -d' },
+    { text: 'Runs in dev mode.' },
+    { text: '[boolean]', align: 'right' }])
+
+  .break()
+
+  .section({ text: '© 2018 Tablur', align: 'center' });
+
 
 // Render to string and return.
 const result = table.toString();
@@ -29,7 +57,26 @@ const result = table.toString();
 // OR
 
 // Output to specified writable stream.
-table.write();
+table.render(true);
+```
+
+#### Shorthand
+
+Tablur has handy shorthand that is a little easier to look at than a bunch of objects. Using column configuration objects still gives the best control but using shorthand works well for simpler solutions and is a bit quicker to write.
+
+Here's the order
+
+**text|width|align|padding**
+
+OR
+
+**text|align|padding**
+
+```ts
+table.row('Some Title|center');
+
+// use : for padding order is top, right, bottom, left
+table.row('Username|30|left|0:1:0:1', 'Email|50');
 ```
 
 ## Options
@@ -41,59 +88,51 @@ A quick note on "padding". The vertical padding is not 1 to 1. This is because i
     <tr><td>Name</td><td>Description</td><td>Default</td></tr>
   </thead>
   <tbody>
-      <tr><td>width</td><td>the width of your table.</td><td>auto</td></tr>
-      <tr><td>scheme</td><td>the wrapping mode, wrap, truncate or none.</td><td>wrap</td></tr>
-      <tr><td>padding</td><td>the value for padding/gutters.</td><td>0</td></tr>
-      <tr><td>border</td><td>the border to use if any.</td><td>undefined</td></tr>
-      <tr><td>borderColor</td><td>a color to style the border with.</td><td>undefined</td></tr>
-      <tr><td>sizes</td><td>a number or array of numbers matching column count.</td><td>undefined</td></tr>
-      <tr><td>aligns</td><td>an array of global alignment values.</td><td>undefined</td></tr>
-      <tr><td>borders</td><td>a map object containing border values.</td><td>undefined</td></tr>
-      <tr><td>rows</td><td>rows to initialize with just calls table.rows(rows).</td><td>[]</td></tr>
+      <tr><td>stream</td><td>writable output stream.</td><td>process.stdout</td></tr>
+      <tr><td>width</td><td>the width of your table, use "0" for auto.</td><td>undefined</td></tr>
+      <tr><td>justify</td><td>when true justify columns to widest width.</td><td>true</td></tr>
+      <tr><td>gutter</td><td>the width between columns.</td><td>2</td></tr>
+      <tr><td>shift</td><td>when true trailing space against boundary trimmed.</td><td>false</td></tr>
+      <tr><td>padding</td><td>global column padding settings.</td><td>[0, 0, 0, 0]</td></tr>
+      <tr><td>border</td><td>border to use - single, double, round, singleDouble, doubleSingle, classic.</td><td>undefined</td></tr>
+      <tr><td>borderColor</td><td>red, green, blue, cyan, yellow, magenta, black, gray, redBright, greenBright, blueBright, cyanBright, yellowBright, magentaBright</td><td>undefined</td></tr>
+      <tr><td>stringLength</td><td>method used to calculate string length.</td><td>2</td></tr>
   </tbody>
 </table>
 
+
 ## API
 
-The Tablur API is very simple. There are really four main methods, .row(), .header(), .footer() and .write(). In fact you'll primarily use two of those in most cases.
+The Tablur API is very simple. You can add columns as strings with shorthand or as objects.
 
 ### row
 
 Adds a new row to the table.
+See [Docs](https://blujedis.github.io/tablur/) for more on method arguments.
 
 <table>
-  <tr><td>Arguments</td><td>(...cols: (string | ITablerColumn)[])</td></tr>
+  <tr><td>Arguments</td><td>text: any | ITablurColumn | any[] | ITablurColumn[], width?: number | TablurAlign | ITablurColumnGlobal,
+    align?: TablurPadding | TablurAlign, padding?: TablurPadding</td></tr>
   <tr><td>Returns</td><td>Tablur</td></tr>
 </table>
 
-### rows
+### section
 
-Adds array of rows to the table.
+Creates a section header. Similar to row but with some opinions most commonly used for this purpose.
+See [Docs](https://blujedis.github.io/tablur/) for more on method arguments.
 
 <table>
-  <tr><td>Arguments</td><td>(...rows: (string | ITablerColumn)[][])</td></tr>
+  <tr><td>Arguments</td><td>text: string | ITablurColumn, align?: TablurPadding | TablurAlign, padding?: TablurPadding</td></tr>
   <tr><td>Returns</td><td>Tablur</td></tr>
 </table>
 
-### header
+### repeat
 
-Adds a header to the table, optionally with overridable options or alignment. Options object should always be the last argument.
-
-<table>
-  <tr><td>Arguments</td><td>(text: string, align?: TablerAlign)</td></tr>
-  <tr><td>Arguments</td><td>(text: string, options?: ITablerOptionsBase)</td></tr>
-  <tr><td>Arguments</td><td>(...cols: (string | TablerAlign | ITablerOptionsBase)[])</td></tr>
-  <tr><td>Returns</td><td>Tablur</td></tr>
-</table>
-
-### footer
-
-Adds a footer to the table, optionally with overridable options or alignment. Options object should always be the last argument.
+Repeats a string in a row. For example if you wanted to have a row with *************************.
+See [Docs](https://blujedis.github.io/tablur/) for more on method arguments.
 
 <table>
-  <tr><td>Arguments</td><td>(text: string, align?: TablerAlign)</td></tr>
-  <tr><td>Arguments</td><td>(text: string, options?: ITablerOptionsBase)</td></tr>
-  <tr><td>Arguments</td><td>(...cols: (string | TablerAlign | ITablerOptionsBase)[])</td></tr>
+  <tr><td>Arguments</td><td>text: string | ITablurColumn, align?: TablurPadding | TablurAlign, padding?: TablurPadding</td></tr>
   <tr><td>Returns</td><td>Tablur</td></tr>
 </table>
 
@@ -106,16 +145,6 @@ Adds an empty break row to the table.
   <tr><td>Returns</td><td>Tablur</td></tr>
 </table>
 
-### section
-
-Creates a section header.
-
-<table>
-  <tr><td>Arguments</td><td>(column: ITablerColumn)</td></tr>
-  <tr><td>Arguments</td><td>(name: string, align: TablerAlign)</td></tr>
-  <tr><td>Returns</td><td>Tablur</td></tr>
-</table>
-
 ### toString
 
 Renders the table and returns string representation.
@@ -125,13 +154,13 @@ Renders the table and returns string representation.
   <tr><td>Returns</td><td>string</td></tr>
 </table>
 
-### write
+### render
 
-Renders the table and writes to output stream.
+Renders the table and writes to output stream. Pass true to wrap output in new lines for spacing.
 
 <table>
-  <tr><td>Arguments</td><td>(wrap: string, stream?: NodeJS.WritableStream)</td></tr>
-  <tr><td>Returns</td><td>void</td></tr>
+  <tr><td>Arguments</td><td>(wrap?: boolean)</td></tr>
+  <tr><td>Returns</td><td>Tablur</td></tr>
 </table>
 
 ### clear
@@ -145,20 +174,12 @@ Clears the current rows but maintains options.
 
 ### reset
 
-Clears rows and resets all options, optionally can provide new options.
+Clears rows and resets all options, optionally can provide new options and debug mode.
 
 <table>
-  <tr><td>Arguments</td><td>(options?: ITablerOptions)</td></tr>
+  <tr><td>Arguments</td><td>(options?: ITablerOptions, debug?: boolean)</td></tr>
   <tr><td>Returns</td><td>Tablur</td></tr>
 </table>
-
-## Benchmark
-
-As a bonus Tablur is pretty quick also! (yes there's a typo in the name lol).
-
-<p align="left">
-  <a href="http://github.com/blujedis/tablur"><img src="https://raw.githubusercontent.com/blujedis/tablur/master/assets/benchmark.png"></a>
-</p>
 
 ## Docs
 

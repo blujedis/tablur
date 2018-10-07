@@ -1,18 +1,84 @@
-import * as ws from 'term-size';
-import * as wrapAnsi from 'wrap-ansi';
-import * as ansiWidth from 'string-width';
 import * as stripAnsi from 'strip-ansi';
-import { Colurs, IAnsiStyles } from 'colurs';
+import * as wrapAnsi from 'wrap-ansi';
+import { isBoolean, isString, isNumber, isObject, includes, isValue, last, first, isPlainObject, isUndefined } from 'chek';
+import { Colurs, IColurs } from 'colurs';
+import { inspect } from 'util';
+import * as termSize from 'term-size';
 
-import { ITablurOptions, TablurScheme, ITablurColumnInternal, TablurAlign, TablurBorder, ITablurColumn, ITablurConfig, ITablurMap, TablurColor, ITablurOptionsBase } from './interfaces';
+import { TablurPadding, ITablurOptions, ITablurBorders, ITablurBorder, ITablurTokens, ITablurColumn, TablurAlign, TablurBorder, ITablurColumnGlobal } from './interfaces';
 
-const colurs = new Colurs();
 
-const BASE_OPTIONS_KEYS = ['width', 'scheme', 'padding', 'sizes', 'border', 'borderColor'];
+// HELPERS //
 
-export const TABLER_BORDERS = {
+function seedArray<T>(len: number, def?: any, seed?: T[]): T[] {
+  seed = seed || [];
+  def = def || 0;
+  if (isValue(seed) && !Array.isArray(seed))
+    seed = [seed];
+  let arr = new Array(len).fill(def);
+  return arr.map((v, i) => {
+    return seed[i] || v;
+  });
+}
 
-  'single': {
+function toPadding(padding: TablurPadding, def?: TablurPadding, seed?: number[]): [number, number, number, number] {
+  def = isValue(def) ? def : [0, 0, 0, 0];
+  if (isNumber(def))
+    def = seedArray(4, def) as any;
+  if (!isValue(padding))
+    padding = def;
+  if (isNumber(padding))
+    padding = seedArray(4, padding) as any;
+  padding = (padding as any).map((v, i) => {
+    v = seed ? seed[i] : v || 0;
+    if (isString(v))
+      v = parseInt(v, 10);
+    return v;
+  });
+  return <any>(padding || def);
+}
+
+function isDecimal(val: any) {
+  if (isString(val))
+    val = parseInt(val, 10);
+  return (val % 1) !== 0;
+}
+
+function toContentWidth(width: number) {
+  const termWidth = termSize().columns;
+  if (width === 0)
+    width = termWidth;
+  if (isDecimal(width))
+    width = Math.round(termWidth * width);
+  return width;
+}
+
+function divide(val: number, by: number) {
+  const width = Math.max(0, Math.floor(val / by));
+  const remainder = Math.max(0, val % by);
+  return {
+    width,
+    remainder
+  };
+}
+
+// CONSTANTS //
+
+const DEFAULT_OPTIONS: ITablurOptions = {
+  stream: process.stdout,
+  width: undefined,
+  justify: true,
+  gutter: 2,
+  shift: false,
+  padding: [0, 0, 0, 0],
+  border: undefined,
+  borderColor: undefined,
+  stringLength: undefined
+};
+
+const BORDERS: ITablurBorders = {
+
+  single: {
     'topLeft': '┌',
     'topRight': '┐',
     'bottomRight': '┘',
@@ -20,7 +86,7 @@ export const TABLER_BORDERS = {
     'vertical': '│',
     'horizontal': '─'
   },
-  'double': {
+  double: {
     'topLeft': '╔',
     'topRight': '╗',
     'bottomRight': '╝',
@@ -28,7 +94,7 @@ export const TABLER_BORDERS = {
     'vertical': '║',
     'horizontal': '═'
   },
-  'round': {
+  round: {
     'topLeft': '╭',
     'topRight': '╮',
     'bottomRight': '╯',
@@ -36,7 +102,7 @@ export const TABLER_BORDERS = {
     'vertical': '│',
     'horizontal': '─'
   },
-  'single-double': {
+  singleDouble: {
     'topLeft': '╓',
     'topRight': '╖',
     'bottomRight': '╜',
@@ -44,7 +110,7 @@ export const TABLER_BORDERS = {
     'vertical': '║',
     'horizontal': '─'
   },
-  'double-single': {
+  doubleSingle: {
     'topLeft': '╒',
     'topRight': '╕',
     'bottomRight': '╛',
@@ -52,7 +118,7 @@ export const TABLER_BORDERS = {
     'vertical': '│',
     'horizontal': '═'
   },
-  'classic': {
+  classic: {
     'topLeft': '+',
     'topRight': '+',
     'bottomRight': '+',
@@ -63,1098 +129,748 @@ export const TABLER_BORDERS = {
 
 };
 
-const DEFAULTS: ITablurOptions = {
-  width: ws().columns,            // the width of the table.
-  scheme: TablurScheme.wrap,      // the wrapping scheme.
-  padding: 2,                      // the gutter/padding size between columns.
-  sizes: undefined,                // a static size or array of sizes.
-  borders: {},                    // the default map for borders.
-  rows: []                        // rows to initialize with.
-};
+// CLASS //
 
 export class Tablur {
 
-  private _rows: ITablurColumnInternal[][] = [];
-  private _header: Tablur;
-  private _footer: Tablur;
-  private _indexed: ITablurMap<number> = {};
-
   options: ITablurOptions;
+  border: ITablurBorder;
+  debug: boolean;
+  tokens: ITablurTokens;
+  rows: ITablurColumn[][] = [];
+  colurs: IColurs;
 
-  constructor(options?: ITablurOptions) {
-
-    this.options = Object.assign({}, DEFAULTS, options);
-    this.init();
-
+  constructor(options?: ITablurOptions | boolean, debug?: boolean) {
+    this.init(<ITablurOptions>options, debug);
   }
 
-  private init() {
+  private init(options: ITablurOptions | boolean, debug: boolean) {
 
-    // Merge in default borders.
-    this.options.borders = Object.assign({}, TABLER_BORDERS, this.options.borders);
-
-    // Must have even number for borders.
-    if (this.options.border && this.options.padding % 2)
-      this.options.padding += 1;
-
-    // Set colorization.
-    colurs.setOption('enabled', this.options.colorize);
-
-    // Add rows that were passed in init.
-    this.rows(this.options.rows);
-
-  }
-
-  // HELPERS //
-
-  /**
-   * Gets the size of the terminal columns and rows.
-   */
-  get size(): { columns: number, rows: number } {
-    return ws();
-  }
-
-  protected sum(nums: number[]) {
-    return nums.reduce((a, c) => a += c);
-  }
-
-  protected isBaseOptions(obj: any) {
-    if (typeof obj !== 'object')
-      return false;
-    const baseKey = Object.keys(obj)[0];
-    return ~BASE_OPTIONS_KEYS.indexOf(baseKey);
-  }
-
-  protected findIndices(str: string, char: string) {
-    const arr = [];
-    const row = stripAnsi(str);
-    for (let i = 0; i < row.length; i++)
-      if (row[i] === char) arr.push(i);
-    return arr;
-  }
-
-  protected pad(str: string, width: number, align: TablurAlign = TablurAlign.left) {
-
-    let adj = Math.max(0, width - ansiWidth(str));
-    let rem = '';
-    let pad = ' '.repeat(adj);
-
-    // adjust pad if centering is required.
-    if (align === TablurAlign.center) {
-      rem = ' '.repeat(Math.max(0, adj % 2));
-      adj = (adj / 2);
-      pad = ' '.repeat(adj);
-      const x = (pad + str + pad + rem).length;
-      return pad + str + pad + rem;
+    if (isBoolean(options)) {
+      debug = <boolean>options;
+      options = undefined;
     }
 
-    if (align === TablurAlign.right)
-      return pad + str;
+    this.debug = debug;
+    this.options = options = Object.assign({}, DEFAULT_OPTIONS, options) as ITablurOptions;
+    this.border = BORDERS[options.border];
 
-    return str + pad;
+    if (this.options.borderColor)
+      this.options.colorize = true;
 
-  }
+    this.colurs = new Colurs({ enabled: this.options.colorize });
 
-  protected truncate(str: string, len: number) {
-    return str.slice(0, len - 3) + '...';
-  }
-
-  protected fillArray(count: number, val: any = '') {
-    return Array.from(new Array(Math.ceil(count)), __ => val);
-  }
-
-  protected toPercentage(num: number, of: number = 100, places?: number): number {
-
-    // check if is decimal using modulous.
-    num = num % 1 !== 0 ? num * of : num;
-
-    // to fixed if decimal places.
-    return places >= 0 ? parseFloat((num / of).toFixed(places)) : num / of;
-
-  }
-
-  protected horizontalFill(width: number, char: string, endcap?: string, offset: number = 0) {
-    width = endcap ? (width - 2) + offset : width + offset;
-    let horiz = char.repeat(width);
-    if (endcap)
-      return endcap + horiz + endcap;
-    return horiz;
-  }
-
-  protected toArray(val: any, def: any[] = []) {
-    if (typeof val === undefined)
-      return def;
-    if (Array.isArray(val))
-      return val;
-    return [val];
-  }
-
-  // COLUMNS & LAYOUT //
-
-  protected layoutWidth(width?: number) {
-    return width || this.options.width || this.size.columns;
-  }
-
-  protected toColumn(col: string | ITablurColumnInternal) {
-    if (typeof col === 'string')
-      col = {
-        text: col
-      };
-    col.text = col.text || '';
-    col.size = col.size || 0;
-    col.configure = col.configure === false ? false : true;
-    col.length = ansiWidth(col.text);
-    col.adjusted = Math.max(col.size, col.length, 0);
-    return col;
-  }
-
-  private columnCounts(rows?: ITablurColumnInternal[][]) {
-    return (rows || this._rows).reduce((a, r, i) => {
-      let total = 0;
-      r.forEach((v, n) => {
-        if (!v.configure) return;
-        a.columns[n] = Math.max(v.adjusted, a.columns[n] || 0, 0);
-        total += a.columns[n];
-      });
-      a.total = Math.max(total, a.total);
-      return a;
-    }, { columns: [], total: 0 });
-  }
-
-  private calculateOffset(columns: number, padding: number, border: boolean) {
-    return Math.max(0, !border
-      ? (columns - 1) * padding
-      : ((columns + 1) * padding) + (columns + 1));
-  }
-
-  private buildRow(...cols: (string | ITablurColumnInternal)[]) {
-
-    const sizes = this.toArray(this.options.sizes);
-    const aligns = this.toArray(this.options.aligns);
-
-    return cols.map((c, i) => {
-      c = this.toColumn(c);
-      if (c.configure) { // ignore non configurable columns like sections & breaks.
-        const size = sizes[i] || sizes[0] || 0;
-        c.adjusted = Math.max(c.adjusted, size);
-        const align = aligns[i] || aligns[0] || TablurAlign.left;
-        c.align = c.align || align;
-      }
-      return c;
-    });
-  }
-
-  // RENDERING & CONFIGURATION //
-
-  private renderColumnsAdjust(pconfig: ITablurConfig, config: ITablurConfig) {
-
-    // If the same number of columns just match column widths.
-    if (pconfig.columns.length === config.columns.length) {
-
-      let cols;
-
-      // Get the optimal widths based on main table
-      // width divided by the footer's column count.
-      const colWidths = Math.floor(config.total / pconfig.columns.length);
-
-      // Get the remainder if any.
-      const colRem = config.total % pconfig.columns.length;
-
-      cols = this.fillArray(pconfig.columns.length, colWidths);
-
-      // Add any remainder to last column
-      if (colRem)
-        cols[cols.length - 1] = cols[cols.length - 1] + (colRem || 0);
-
-      pconfig.columns = cols;
-
-    }
-
-    // If not same column count calculate percentages
-    // to respect user defined dimensions.
-    else {
-
-      // Map current col vals to percentages of width so we
-      // can maintain aspect ratio.
-      pconfig.columns = pconfig.columns.map(v => Math.floor(this.toPercentage(v, pconfig.total) * config.total));
-
-      // We need to ensure the columns are the same total length.
-      const adjusted = Math.max(0, config.total - this.sum(pconfig.columns));
-
-      // Add any adjustment so our totals match.
-      pconfig.columns[pconfig.columns.length - 1] = pconfig.columns[pconfig.columns.length - 1] + adjusted;
-
-    }
-
-    pconfig.total = config.total;
-    pconfig.adjustedLayout = config.adjustedLayout;
-    pconfig.layout = config.layout;
-    pconfig.adjustment = config.adjustment;
-    pconfig.remainder = config.remainder;
-
-    return pconfig;
-
-  }
-
-  private renderHeader(rows: string[], config: ITablurConfig) {
-
-    let pconfig = this.renderColumnsAdjust(this._header.columnCounts(), config);
-
-    const bdr = this.options.borders[this.options.border];
-    let header = this._header.render(pconfig);
-
-    const fillCount = Math.round(this._header.options.padding / 2);
-    const boxFill = this.wrap(config.layout, fillCount, this.options.border);
-
-    const isNextBreak = this._indexed[0];
-
-    if (this._header.options.border) {
-      let btmBorder = [this.horizontalFill(config.layout, bdr.horizontal, bdr.vertical)];
-      if (!isNextBreak)
-        header = header.slice(0, header.length - 1);
-      else
-        btmBorder = [];
-      header = [...header, ...btmBorder];
-    }
-    else {
-      header = [...header, ...boxFill.fill, boxFill.top];
-    }
-
-    // Add the header to the rows.
-    return [...header, ...rows];
-
-  }
-
-  private renderFooter(rows: string[], config: ITablurConfig) {
-
-    // Parse the footer columns.
-    let pconfig = this.renderColumnsAdjust(this._footer.columnCounts(), config);
-
-    const bdr = this.options.borders[this.options.border];
-
-    const fillCount = Math.round(this._footer.options.padding / 2);
-    const boxFill = this.wrap(config.layout, fillCount, this.options.border);
-
-    const isPrevBreak = this._indexed[this._rows.length - 1];
-
-    let footer = this._footer.render(pconfig);
-    if (this._footer.options.border) {
-      let topBorder = [this.horizontalFill(config.layout, bdr.horizontal, bdr.vertical)];
-      if (!isPrevBreak)
-        footer = footer.slice(1);
-      else
-        topBorder = [];
-      footer = [...topBorder, ...footer];
-    }
-    else {
-      footer = [boxFill.bottom, ...boxFill.fill, ...footer, ...boxFill.fill];
-    }
-
-    return [...rows, ...footer];
-
-  }
-
-  /**
-  * Wrap creates border wrap and builds fill rows for padding.
-  *
-  * @example .wrap(75, 3, TablerBorder.round, [0, 12, 40]);
-  *
-  * @param width the width of the element to border wrap.
-  * @param fill the fill count for padding.
-  * @param border the border to use.
-  * @param indices indices to match bordering for fill rows.
-  */
-  protected wrap(width: number, fill: number, border?: TablurBorder, indices?: number[]) {
-
-    let bdr = this.options.borders[border];
-
-    bdr = bdr || {
-      topLeft: '',
-      topRight: '',
-      bottomLeft: '',
-      bottomRight: '',
-      horizontal: '',
-      vertical: ''
+    this.tokens = {
+      pad: debug ? this.colurs.blueBright('P') : ' ',
+      align: debug ? this.colurs.greenBright('A') : ' ',
+      indent: debug ? this.colurs.cyanBright('>') : ' ',
+      shift: debug ? this.colurs.magentaBright('S') : ' '
     };
 
-    let baseFill = this.horizontalFill(width, bdr.horizontal, null, -2);
+  }
 
-    let horizFill: any = this.horizontalFill(width, ' ', bdr.vertical);
+  private pad(str: string, dir: TablurAlign, width: number, char: string = ' ') {
 
-    if (indices && indices.length) {
-      indices.forEach(v => {
-        horizFill = horizFill.slice(0, v) + bdr.vertical + horizFill.slice(v + 1);
-      });
+    const len = this.stringLength(str);
+
+    if (len > width)
+      return str;
+
+    const baseOffset = Math.max(0, width - len);
+
+    if (dir === 'left')
+      return char.repeat(baseOffset) + str;
+
+    if (dir === 'right')
+      return str + char.repeat(baseOffset);
+
+    const div = divide(baseOffset, 2);
+    return char.repeat(div.width) + str + char.repeat(div.width) + char.repeat(div.remainder);
+
+  }
+
+  // Shift text so that right or left
+  // aligned text doesn't have space
+  // at the boundary position.
+  private shiftLine(text: string, align: string) {
+
+    const exp = align === 'right' ? /\s+$/ : /^\s+/;
+    if (align === 'center' || !exp.test(text))
+      return text;
+
+    const matches = (text.match(exp) || []).map(v => this.tokens.shift);
+
+    // Add one so that join works.
+    if (matches.length)
+      matches.push(matches[0]);
+
+    text = text.replace(exp, '');
+
+    if (align === 'left')
+      return (text += matches.join(''));
+
+    return matches.join('') + text;
+
+  }
+
+  private stringLength(str: string) {
+
+    const fn = this.options.stringLength || function (s) {
+      s = stripAnsi(s);
+      s = s.replace(/\n/g, '');
+      return s.length;
+    };
+
+    return fn(str);
+
+  }
+
+  padLeft(str: string, width: number, char: string) {
+    return this.pad(str, 'left', width, char);
+  }
+
+  padCenter(str: string, width: number, char: string) {
+    return this.pad(str, 'center', width, char);
+  }
+
+  padRight(str: string, width: number, char: string) {
+    return this.pad(str, 'right', width, char);
+  }
+
+  getBorders(width: number, border: TablurBorder | ITablurBorder) {
+
+    let _border = <ITablurBorder>border;
+
+    if (isString(border))
+      _border = BORDERS[<string>border];
+
+    if (!_border) return undefined;
+
+    const bdr = this.border;
+    let top = bdr.topLeft + bdr.horizontal.repeat(width - 2) + bdr.topRight;
+    let horizontal = bdr.vertical + bdr.horizontal.repeat(width - 2) + bdr.vertical;
+    let bottom = bdr.bottomLeft + bdr.horizontal.repeat(width - 2) + bdr.bottomRight;
+
+    if (this.options.borderColor) {
+      top = this.colurs.applyAnsi(top, this.options.borderColor);
+      horizontal = this.colurs.applyAnsi(horizontal, this.options.borderColor);
+      bottom = this.colurs.applyAnsi(bottom, this.options.borderColor);
     }
-
-    horizFill = this.fillArray(fill, horizFill) as string[];
 
     return {
-      top: bdr.topLeft + baseFill + bdr.topRight,
-      bottom: bdr.bottomLeft + baseFill + bdr.bottomRight,
-      fill: horizFill
+      top,
+      bottom,
+      horizontal
     };
 
   }
 
-  // API //
+  getMaxRow(rows: ITablurColumn[] | ITablurColumn[][], widthOnly?: boolean) {
 
-  /**
-   *
-   * @param str a string to be colorized.
-   * @param styles
-   */
-  colorize(str: string, styles?: TablurColor | IAnsiStyles | IAnsiStyles[]) {
-    styles = styles || this.options.borderColor as any;
-    if (!styles)
-      return str;
-    if (!Array.isArray(styles))
-      styles = [<any>styles];
-    return colurs.applyAnsi(str, <IAnsiStyles[]>styles);
-  }
+    let _rows = <ITablurColumn[][]>rows;
+    if (!Array.isArray(rows[0]))
+      _rows = [<any>_rows] as ITablurColumn[][];
 
-  /**
-   * Add header row with alignment.
-   *
-   * @example .header('My Header', TablerAlign.center);
-   *
-   * @param text header column text.
-   * @param align column alignment.
-   */
-  header(
-    text: string,
-    align?: TablurAlign
-  ): Tablur;
+    // Ensure gutter divisible by 2.
+    const gutter = Math.max(0, Math.floor(this.options.gutter / 2)) * 2;
 
-  /**
-   * Add header row with options.
-   *
-   * @example .header({ text: 'copyright 2018' }, { option overrides });
-   *
-   * @param col header column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  header(
-    col: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
+    const totals = _rows.reduce((result, columns, n) => {
 
-  /**
-   * Add header row with options.
-   *
-   * @example .header('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 header column title or configuration object.
-   * @param col2 header column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  header(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
+      let curCount = columns.length;
 
-  /**
-   * Add header row with options.
-   *
-   * @example .header('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 footer column title or configuration object.
-   * @param col2 footer column title or configuration object.
-   * @param col3 footer column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  header(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
+      columns.forEach((col, i) => {
 
-  /**
-   * Add header row with options.
-   *
-   * @example .header('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 header column title or configuration object.
-   * @param col2 header column title or configuration object.
-   * @param col3 header column title or configuration object.
-   * @param col4 header column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  header(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    col4: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
+        let len = (col.width || this.stringLength(col.text));
 
-  /**
-   * Add header row with options.
-   *
-   * @example .header('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 header column title or configuration object.
-   * @param col2 header column title or configuration object.
-   * @param col3 header column title or configuration object.
-   * @param col4 header column title or configuration object.
-   * @param col5 header column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  header(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    col4: string | ITablurColumn,
-    col5: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add header row with options.
-   *
-   * @example .header('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 header column title or configuration object.
-   * @param col2 header column title or configuration object.
-   * @param col3 header column title or configuration object.
-   * @param col4 header column title or configuration object.
-   * @param col5 header column title or configuration object.
-   * @param col6 header column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  header(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    col4: string | ITablurColumn,
-    col5: string | ITablurColumn,
-    col6: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add header using columns.
-   *
-   * @param cols the header's columns.
-   */
-  header(...cols: (string | ITablurColumn)[]): Tablur;
-
-  header(...cols: (string | TablurAlign | ITablurColumn | ITablurOptionsBase)[]) {
-
-    let options = {};
-
-    // Check if options object.
-    if (this.isBaseOptions(cols[cols.length - 1])) {
-      options = cols[cols.length - 1];
-      cols = cols.slice(0, cols.length - 2);
-    }
-
-    let align: TablurAlign;
-
-    if (TablurAlign[<any>cols[1]]) {
-
-      align = <any>cols[1];
-      cols = [...cols.slice(0, 1), ...cols.slice(2)];
-
-      if (typeof cols[0] === 'string') {
-        cols[0] = {
-          text: <any>cols[0],
-          align: align
-        };
-      }
-
-    }
-
-    options = Object.assign({}, this.options, options);
-
-    this._header = new Tablur(options);
-    this._header.row(...cols.map(n => this.toColumn(<any>n)));
-
-    return this;
-
-  }
-
-  /**
-   * Add footer row with alignment.
-   *
-   * @example .footer('copyright 2018', TablerAlign.center);
-   *
-   * @param text footer column text.
-   * @param align column alignment.
-   */
-  footer(
-    text: string,
-    align?: TablurAlign
-  ): Tablur;
-
-  /**
-   * Add footer row with options.
-   *
-   * @example .footer({ text: 'copyright 2018' }, { option overrides });
-   *
-   * @param col footer column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  footer(
-    col: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add footer row with options.
-   *
-   * @example .footer('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 footer column title or configuration object.
-   * @param col2 footer column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  footer(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add footer row with options.
-   *
-   * @example .footer('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 footer column title or configuration object.
-   * @param col2 footer column title or configuration object.
-   * @param col3 footer column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  footer(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add footer row with options.
-   *
-   * @example .footer('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 footer column title or configuration object.
-   * @param col2 footer column title or configuration object.
-   * @param col3 footer column title or configuration object.
-   * @param col4 footer column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  footer(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    col4: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add footer row with options.
-   *
-   * @example .footer('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 footer column title or configuration object.
-   * @param col2 footer column title or configuration object.
-   * @param col3 footer column title or configuration object.
-   * @param col4 footer column title or configuration object.
-   * @param col5 footer column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  footer(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    col4: string | ITablurColumn,
-    col5: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add footer row with options.
-   *
-   * @example .footer('Column 1', 'Column 2'..., { option overrides });
-   *
-   * @param col1 footer column title or configuration object.
-   * @param col2 footer column title or configuration object.
-   * @param col3 footer column title or configuration object.
-   * @param col4 footer column title or configuration object.
-   * @param col5 footer column title or configuration object.
-   * @param col6 footer column title or configuration object.
-   * @param options options used to override inherited defaults.
-   */
-  footer(
-    col1: string | ITablurColumn,
-    col2: string | ITablurColumn,
-    col3: string | ITablurColumn,
-    col4: string | ITablurColumn,
-    col5: string | ITablurColumn,
-    col6: string | ITablurColumn,
-    options?: ITablurOptionsBase
-  ): Tablur;
-
-  /**
-   * Add footer using columns.
-   *
-   * @param cols the footer's columns.
-   */
-  footer(...cols: (string | ITablurColumn | ITablurOptionsBase)[]): Tablur;
-
-  footer(...cols: (string | TablurAlign | ITablurColumn | ITablurOptionsBase)[]) {
-
-    let options = {};
-
-    // Check if options object.
-    if (this.isBaseOptions(cols[cols.length - 1])) {
-      options = cols[cols.length - 1];
-      cols = cols.slice(0, cols.length - 2);
-    }
-
-    let align: TablurAlign;
-
-    if (TablurAlign[<any>cols[1]]) {
-
-      align = <any>cols[1];
-      cols = [...cols.slice(0, 1), ...cols.slice(2)];
-
-      if (typeof cols[0] === 'string') {
-        cols[0] = {
-          text: <any>cols[0],
-          align: align
-        };
-      }
-
-    }
-
-    options = Object.assign({}, this.options, options);
-
-    this._footer = new Tablur(options);
-    this._footer.row(...cols.map(n => this.toColumn(<any>n)));
-
-    return this;
-
-  }
-
-  /**
-   * Adds a new row to the instance.
-   *
-   * @example .row('column 1', { text: 'column 2' });
-   *
-   * @param cols the columns of the row to be added.
-   */
-  row(...cols: (string | ITablurColumn)[]) {
-    if (!cols.length)
-      return;
-    this._rows = [...this._rows, this.buildRow(...cols)];
-    return this;
-  }
-
-  /**
-   * Adds multiple rows containing table columns.
-   *
-   * @example .rows([ ['row1-col1], [{ text: 'row2-col1 }] ]);
-   *
-   * @param rows the rows of table columns to add.
-   */
-  rows(rows: (string | ITablurColumn)[][]) {
-    rows.forEach(v => this.row(...v));
-    return this;
-  }
-
-  /**
-   * Creates an empty break in the table.
-   *
-   * @example .break();
-   */
-  break() {
-    this._indexed[this._rows.length] = 1;
-    this.row(<ITablurColumn>{ text: '', configure: false });
-    return this;
-  }
-
-  /**
-   * Adds a row as a section header.
-   *
-   * @example .section({ text: 'Section:' , align: TablerAlign.center });
-   *
-   * @param column the column configuration.
-   */
-  section(column: ITablurColumn): Tablur;
-
-  /**
-   * Adds a row as a section header.
-   *
-   * @example .section('Section:', TablerAlign.left);
-   *
-   * @param name the name or title of the section.
-   * @param align the alignment for the section title.
-   */
-  section(name: string, align?: TablurAlign): Tablur;
-
-  section(name: string | ITablurColumn, align?: TablurAlign) {
-
-    if (typeof name === 'string') {
-      name = {
-        text: name
-      };
-    }
-
-    this._indexed[this._rows.length] = 2;
-    name.configure = false;
-    name.align = align;
-    this.row(name);
-
-    return this;
-
-  }
-
-  /**
-   * Configures rows for output adjusting and normalizing cells.
-   *
-   * @example .configure({ // optional parent config });
-   *
-   * @param config optional parent configuration to override with.
-   */
-  configure(config?: ITablurConfig) {
-
-    // Get layout width and get max columns and adjusted widths.
-    const layoutWidth = this.layoutWidth();
-    config = config || this.columnCounts(this._rows);
-    config.layout = layoutWidth;
-    config.lines = {};
-
-    const colCount = config.columns.length;
-
-    const offset =
-      this.calculateOffset(colCount, this.options.padding, !!this.options.border);
-    config.adjustedLayout = (layoutWidth - offset);
-
-    let adjTotal = config.total,
-      adjWidth = config.adjustedLayout,
-      adjNeg = true;
-
-    // Layout width is too narrow.
-    if (config.adjustedLayout > config.total) {
-      adjTotal = config.adjustedLayout;
-      adjWidth = config.total;
-      adjNeg = false;
-    }
-
-    config.adjustment = Math.max(0, Math.floor(((adjTotal - adjWidth) / colCount)));
-    config.remainder = Math.max(0, (adjTotal - adjWidth) % colCount);
-
-    if (adjNeg) {
-      config.adjustment = -Math.abs(config.adjustment);
-      config.remainder = -Math.abs(config.remainder);
-    }
-
-    this._rows = config.rows = this._rows.map((row, i) => {
-
-      // Ensure same length of columns
-      // unless empty or section header.
-      if (row.length < colCount && row[0].configure) {
-        row = [...row, ...this.fillArray(colCount - row.length, { text: '', width: 0, length: 0, adjusted: 0 })];
-      }
-
-      let remainder = Math.abs(config.remainder);
-      const decrementer = Math.ceil(remainder / colCount);
-
-      return row.reduce<ITablurColumnInternal[]>((accum, col, n) => {
-
-        if (col.configure) {
-
-          // update adjusted with parsed width.
-          col.adjusted = config.columns[n];
-
-          // Subtract any adjustment.
-          col.adjusted += config.adjustment;
-
-          // If any remainder lop it off the widest column.
-          if (remainder) {
-            col.adjusted += adjNeg ? -decrementer : decrementer;
-            remainder -= decrementer;
-          }
-
+        if (!widthOnly) {
+          len += col.indent;
+          len += (col.padding[1] + col.padding[3]);
         }
 
-        // Empty & Section columns are simply the layout width.
-        else {
-          col.adjusted = config.layout;
-          if (this.options.border)
-            col.adjusted -= 2; // add a tiny bit of extra padding.
-        }
+        result.columns[i] = result.columns[i] || 0;
+        result.columns[i] = len > result.columns[i] ? len : result.columns[i];
 
-        // Text too long should be wrapped to next line.
-        if (this.options.scheme === TablurScheme.wrap && col.length > col.adjusted)
-          col.text = wrapAnsi(col.text, col.adjusted, { hard: true });
+      });
 
-        // overlengthed text should be truncated.
-        else if (this.options.scheme === TablurScheme.truncate)
-          col.text = this.truncate(col.text, col.adjusted);
+      let adj = 0;
 
-        // Split text into lines.
-        col.lines = col.text.split('\n');
+      if (!widthOnly) {
 
-        // Update the line count.
-        config.lines[i] = Math.max(config.lines[i] || 0, col.lines.length);
+        // Add gutter.
+        if (columns.length > 1)
+          adj += (gutter * (columns.length - 1));
 
-        accum = [...accum, col];
+        // Add border.
+        if (this.options.border)
+          adj += ((columns.length - 1) + 2);
 
-        return accum;
+      }
 
-      }, []);
+      result.adjustment = adj > result.adjustment ? adj : result.adjustment;
+      result.count = curCount > result.count ? curCount : result.count;
 
-    }, this);
+      return result;
 
+    }, { width: 0, adjustment: 0, count: 0, columns: [] });
 
-    return config;
+    totals.width = totals.columns.reduce((a, c) => a + c, 0) + totals.adjustment;
+
+    return totals;
 
   }
 
-  /**
-   * Render the rows into array of strings.
-   *
-   * @example .render({ // optional parent config });
-   *
-   * @param pconfig the parent's parsed column metadata.
-   */
-  render(pconfig?: ITablurConfig) {
+  normalize(column: ITablurColumn): ITablurColumn[];
+  normalize(columns: string[] | ITablurColumn[], globals?: ITablurColumnGlobal): ITablurColumn[];
+  normalize(text: string): ITablurColumn[];
+  normalize(text: string, align: TablurAlign, padding?: TablurPadding): ITablurColumn[];
+  normalize(text: string, width: number, align?: TablurAlign, padding?: TablurPadding): ITablurColumn[];
+  normalize(text: any | ITablurColumn | any[] | ITablurColumn[], width?: number | TablurAlign | ITablurColumnGlobal,
+    align?: TablurPadding | TablurAlign, padding?: TablurPadding): ITablurColumn[] {
 
-    if (!this._rows.length)
-      return [];
-
-    const config = this.configure(pconfig);
-    const options = this.options;
-
-    let padding = options.padding ? ' '.repeat(options.padding) : '';
-    let joinGutter = padding;
-    const border = options.borders[options.border];
-
-    // let actualWidth;
-
-    if (border) {
-      const borderGutterRepeat = Math.max(0, options.padding / 2);
-      const borderGutter = options.padding && borderGutterRepeat
-        ? ' '.repeat(borderGutterRepeat)
-        : '';
-      joinGutter = borderGutter + border.vertical + borderGutter;
+    if (isString(width)) {
+      padding = <number>align;
+      align = <TablurAlign>width;
+      width = undefined;
     }
 
-    // Iterate rows building lines.
-    let rows = config.rows.reduce<string[]>((a, c, i) => {
+    if (isNumber(align)) {
+      padding = <number>align;
+      align = undefined;
+    }
 
-      return [...a, c.reduce<string[][]>((res, col, n) => {
+    const colDefaults = {
+      align: 'left',
+      shift: this.options.shift,
+      padding: this.options.padding,
+      indent: 0
+    };
 
-        // Ensure same line count when multiline wrap.
-        if (col.lines.length < config.lines[i] && col.configure)
-          col.lines = [...col.lines, ...this.fillArray(config.lines[i] - col.lines.length)];
+    let globalOpts = isObject(width) ? Object.assign({}, colDefaults, <ITablurColumnGlobal>width) : undefined;
 
-        // Map wrapped multilines to correct row/col.
-        col.lines.forEach((l, x) => {
+    width = isNumber(width) ? width : undefined;
+    align = align || 'left';
 
-          res[x] = res[x] || [];
-          const val = this.pad(l, col.adjusted, col.align);
+    if (!Array.isArray(text)) {
 
-          const colLen = config.columns.length;
+      // Convert to column object.
+      if (!isObject(text)) {
+        text = {
+          text,
+          align,
+          width,
+          padding: padding
+        } as ITablurColumn;
+      }
 
-          // Handled bordered tables.
-          if (border && col.configure && (n === 0 || n === (colLen - 1))) {
+      // Single column config passed.
+      text = [text] as ITablurColumn[];
 
-            res[x][n] = n !== 0
-              ? val + padding + border.vertical
-              : colLen === 1
-                ? border.vertical + padding + val + padding + border.vertical
-                : border.vertical + padding + val;
+    }
 
-          }
+    const cols = (text as ITablurColumn[]);
 
-          else if (!col.configure) {
-            const pad = this.options.border ? ' ' : '';
-            res[x][n] = pad + val + pad;
-          }
+    return cols.map((c, i) => {
 
-          // Non bordered table.
-          else {
-            res[x][n] = val;
-          }
+      if (isString(c)) {
 
+        const str = <any>c;
+        let parts = str.split('|').map(v => {
+          if (v === 'null' || v === 'undefined')
+            return undefined;
+          return v;
         });
 
-        return res;
-
-      }, []).map(c => c.join(joinGutter)).join('\n')];
-
-    }, []);
-
-    let horizBorderRow;
-    const fillPad = Math.round(options.padding / 2);
-
-    if (border) {
-
-      horizBorderRow = this.horizontalFill(config.layout, border.horizontal, border.vertical);
-
-      const boxWrap =
-        this.wrap(config.layout, fillPad, options.border, this.findIndices(stripAnsi(rows[0].split('\n')[0]), border.vertical));
-
-      // Override fill if not greater than 1.
-      if (!(fillPad > 1))
-        boxWrap.fill = [];
-
-      const rowFill = [...boxWrap.fill, horizBorderRow, ...boxWrap.fill];
-
-      rows = rows.reduce((a, c, i, arr) => {
-
-        let curFill = rowFill;
-
-        if (this._indexed[i] > 0) {
-          if (this._indexed[i + 1])
-            curFill = [];
+        // allow shorthand config:
+        // text|width|align|padding OR text|align|padding
+        // for padding split with : for top, right, bottom, left.
+        if (parts[1] && includes(['left', 'right', 'center', 'none'], parts[1]))
+          parts = [parts[0], undefined, ...parts.slice(1)];
+        if (parts[3]) {
+          if (~parts[3].indexOf(':'))
+            parts[3] = parts[3].split(':').map(v => parseInt(v, 10));
           else
-            curFill = [boxWrap.top, ...boxWrap.fill];
+            parts[3] = parseInt(parts[3], 10);
+          parts[3] = seedArray(4, 0, parts[3]);
         }
 
-        else if (arr[i + 1] && this._indexed[i + 1] > 0)
-          curFill = [...boxWrap.fill, boxWrap.bottom];
+        parts[1] = isString(parts[1]) ? parseInt(parts[1], 10) : parts[1];
 
-        if (i !== rows.length - 1)
-          a = [...a, c, ...curFill];
-        else
-          a = [...a, c, ...boxWrap.fill];
+        if (parts.length > 1) {
+          c = {
+            text: parts[0],
+            width: parts[1],
+            align: parts[2],
+            padding: parts[3]
+          };
+        }
 
-        return a;
+        else {
+          c = {
+            text: <any>c
+          };
+        }
 
-      }, [...boxWrap.fill]);
+      }
 
+      else if (!isPlainObject(c)) {
+        c = {
+          text: <any>c
+        };
+      }
 
-      if (!this._header && !this._indexed[0])
-        rows = [boxWrap.top, ...rows];
+      // Ensure text is string.
+      // Don't colorize user should do
+      // so if that is desired.
+      if (!isString(c.text))
+        c.text = inspect(c.text, undefined, undefined, false);
 
-      if (!this._footer && !this._indexed[rows.length - 1])
-        rows = [...rows, boxWrap.bottom];
+      c = Object.assign({}, colDefaults, c, globalOpts);
 
+      c.align = c.align || 'left';
+      c.padding = toPadding(c.padding, padding);
+      c.isRow = true;
+
+      return c;
+
+    });
+
+  }
+
+  columnize(cols: ITablurColumn[], maxWidth: number, maxColumns: number[]) {
+
+    let result = [];
+    let resultPad = [];
+
+    const alignMap: any = {
+      left: this.padRight.bind(this),
+      right: this.padLeft.bind(this),
+      center: this.padCenter.bind(this),
+      none: (v, w) => v
+    };
+
+    const colLen = cols.length - 1;
+
+    // Get the widest content width.
+    let contentWidth = this.getMaxRow(cols, true).width;
+
+    // Gutter must be divisible by two
+    // in order to work with borders.
+    let gutter = Math.max(0, Math.floor(this.options.gutter / 2));
+    let gutterLen = (gutter * 2) * colLen;
+
+    // Acount for inner borders wrapped in spaces
+    let borderLen = this.border ? colLen + 2 : 0;
+
+    // Check for border and colorize.
+    let vertBdr = this.options.border ? this.border.vertical : '';
+    vertBdr = this.options.borderColor ? this.colurs.applyAnsi(vertBdr, this.options.borderColor) : vertBdr;
+
+    // Define the gutter string for joining columns.
+    let gutterStr = !gutter ? '' : ' '.repeat(gutter * 2);
+    gutterStr = borderLen ? ' '.repeat(gutter) + vertBdr + ' '.repeat(gutter) : gutterStr;
+
+    // If static row ignore gutter and border.
+    if (cols.length === 1 && cols[0].borders === false) {
+      gutterLen = 0;
+      borderLen = 0;
     }
-    else {
 
-      const rowFill = this.fillArray(fillPad, this.horizontalFill(config.layout, ' '));
+    // The max width available less the gutter and border lengths.
+    let adjWidth = maxWidth - gutterLen - borderLen;
 
-      rows = rows.reduce((a, c, i, arr) => {
+    // The column adjustment if content is less than total width.
+    let colAdjust = Math.max(0, adjWidth - contentWidth);
 
-        let curFill = rowFill;
+    // The width to be added to each column.
+    let colDiv = divide(colAdjust, cols.length);
+    let colRemainDiv = divide(colDiv.remainder, cols.length);
 
-        if (this._indexed[i] > 0)
-          curFill = [];
+    let remainingWidth = adjWidth;
+    let remainingCols = cols.length;
+    let maxLines = [];
 
-        else if (arr[i + 1] && this._indexed[i + 1] > 0)
-          curFill = rowFill[0] || [];
+    const normalized: any = {};
+    const lastCol = cols.length - 1;
 
-        if (i !== rows.length - 1)
-          a = [...a, c, ...curFill];
-        else
-          a = [...a, c];
-        return a;
+    cols.forEach((c, i) => {
 
-      }, []);
+      let str;
+      let colWidth;
+      const char = c.isRepeat ? c.text : null;
+      const padding = c.padding[1] + c.padding[3];
+      const indent = c.indent || 0;
 
+      str = char ? '' : c.text || '';
+
+      // Rows are inner row items that are
+      // NOT a break, section or repeat.
+      if (c.isRow) {
+
+        if (!isValue(c.width)) {
+
+          if (this.options.width === 0)
+            c.width = 0;
+
+          else if (this.options.justify)
+            c.width = maxColumns[i];
+        }
+
+      }
+
+      // Auto size column.
+      if (c.width === 0) {
+
+        const div = divide(remainingWidth, remainingCols);
+        const remainder = divide(div.remainder, remainingCols);
+
+        colWidth = div.width;
+        colWidth = (colWidth + remainder.width) + (i === 0 ? remainder.remainder : 0);
+
+      }
+
+      // Define with by static value or with of content.
+      else {
+
+        const colContentWidth = this.stringLength(c.text) // + (colDiv.width + colRemainDiv.width);
+
+        colWidth = c.width || colContentWidth;
+
+        colWidth = i === lastCol ? colWidth + colRemainDiv.remainder : colWidth;
+
+        if (colWidth < remainingWidth && i === lastCol)
+          colWidth = remainingWidth;
+
+        if (colWidth > remainingWidth)
+          colWidth = remainingWidth;
+
+      }
+
+      remainingWidth -= colWidth;
+      remainingCols -= 1;
+
+      let innerWidth = colWidth - padding - indent;
+
+      const config: any = Object.assign({}, c);
+      config.width = colWidth;
+      config.innerWidth = innerWidth;
+
+      if (c.isRepeat) {
+        const rptDiv = divide(innerWidth, c.text.length);
+        str = c.text.repeat(rptDiv.width);
+        if (rptDiv.remainder)
+          str = (c.text.charAt(0).repeat(rptDiv.remainder));
+      }
+      else {
+        if (this.stringLength(str) > innerWidth)
+          str = wrapAnsi(str, innerWidth, { hard: true, trim: false });
+      }
+
+      config.textArray = str.split('\n');
+      config.lines = str.match(/\n/g) || [];
+      config.borders = c.borders;
+
+      normalized[i] = config;
+      if (config.lines.length > maxLines.length)
+        maxLines = config.lines;
+
+    });
+
+    const map = {};
+
+    const normalizedKeys = Object.keys(normalized);
+    const firstKey = first(normalizedKeys);
+    const lastKey = last(normalizedKeys);
+
+    normalizedKeys.forEach((k, n) => {
+
+      const config = normalized[k];
+
+      // If not enough lines extend to match
+      // the total required lines.
+      if (config.lines.length < maxLines.length) {
+        const adj = maxLines.slice(0, maxLines.length - config.lines.length).map(v => '');
+        config.textArray = [...config.textArray, ...adj];
+      }
+
+      // Build up row used for padding.
+      let buildPadRow = this.tokens.pad.repeat(config.width);
+
+      // Inspect if pad row requires borders.
+      if (this.border && config.borders !== false) {
+
+        if (k === firstKey)
+          buildPadRow = vertBdr + buildPadRow;
+
+        if (k === lastKey)
+          buildPadRow += vertBdr;
+
+        resultPad.push(buildPadRow);
+
+      }
+
+      // Iterate each line building borders and padding.
+      config.textArray.forEach((line, index) => {
+
+        if (config.shift)
+          line = this.shiftLine(line, config.align);
+
+        if (config.padding)
+          line = this.tokens.pad.repeat(config.padding[1]) + line + this.tokens.pad.repeat(config.padding[3]);
+
+        if (config.indent)
+          line = this.tokens.indent.repeat(config.indent) + line;
+
+        line = config.align ? alignMap[config.align](line, config.width, this.tokens.align) : line;
+
+        if (this.border && config.borders !== false) {
+
+          let vertical = this.border.vertical;
+
+          if (this.options.borderColor)
+            vertical = this.colurs.applyAnsi(vertical, this.options.borderColor);
+
+          if (k === firstKey)
+            line = vertical + line;
+
+          if (k === lastKey)
+            line += vertical;
+
+        }
+
+        map[index] = map[index] || [];
+        map[index] = [...map[index], line];
+
+      });
+
+
+    });
+
+    for (const i in map) {
+      const row = map[i];
+      result.push(row.join(gutterStr));
     }
 
-    // Render the header if present.
-    if (this._header)
-      rows = this.renderHeader(rows, config);
+    const padRow = resultPad.length ? resultPad.join(gutterStr) : '';
 
-    // Render the footer if present.
-    if (this._footer)
-      rows = this.renderFooter(rows, config);
+    return {
+      row: result.join('\n'),
+      padRow: padRow
+    };
 
-    return rows;
+  }
+
+  row(column: ITablurColumn): Tablur;
+  row(columns: string[] | ITablurColumn[], globals?: ITablurColumnGlobal): Tablur;
+  row(text: string): Tablur;
+  row(text: string, align: TablurAlign, padding?: TablurPadding): Tablur;
+  row(text: string, width: number, align?: TablurAlign, padding?: TablurPadding): Tablur;
+  row(text: any | ITablurColumn | any[] | ITablurColumn[], width?: number | TablurAlign | ITablurColumnGlobal,
+    align?: TablurPadding | TablurAlign, padding?: TablurPadding): Tablur {
+    const self = this;
+    const normalized = this.normalize(text, <any>width, <any>align, padding);
+    this.rows.push(normalized);
+    return this;
+  }
+
+  section(column: ITablurColumn): Tablur;
+  section(text: string): Tablur;
+  section(text: string, padding: TablurPadding): Tablur;
+  section(text: string, align: TablurAlign, padding?: TablurPadding): Tablur;
+  section(text: string | ITablurColumn, align?: TablurPadding | TablurAlign, padding?: TablurPadding) {
+
+    let obj = <ITablurColumn>text;
+
+    if (isNumber(align) || Array.isArray(align)) {
+      padding = <TablurPadding>align;
+      align = undefined;
+    }
+
+    if (isNumber(padding))
+      padding = <any>[padding, padding, padding, padding];
+
+    align = align || 'left';
+    padding = padding || seedArray(4, 0) as any;
+
+    if (!isObject(text)) {
+      obj = {
+        text,
+        align
+      } as ITablurColumn;
+
+      obj.padding = <any>padding;
+    }
+
+    obj.align = obj.align || <string>align;
+    obj.padding = toPadding(obj.padding);
+    obj.isSection = true;
+    obj.borders = !isValue(obj.borders) ? false : obj.borders;
+    // if (obj.borders && !obj.align)
+    //   obj.align = 'left';
+    this.rows.push([obj]);
+
+    return this;
+
+  }
+
+  repeat(text: string): Tablur;
+  repeat(column: ITablurColumn): Tablur;
+  repeat(text: string, padding: TablurPadding): Tablur;
+  repeat(text: string, align: TablurAlign, padding?: TablurPadding): Tablur;
+  repeat(text: string | ITablurColumn, align?: TablurPadding | TablurAlign, padding?: TablurPadding) {
+
+    let obj = <ITablurColumn>text;
+
+    if (isNumber(align) || Array.isArray(align)) {
+      padding = <TablurPadding>align;
+      align = undefined;
+    }
+
+    if (isNumber(padding))
+      padding = <any>[padding, padding, padding, padding];
+
+    align = align || 'left';
+    padding = padding || seedArray(4, 0) as any;
+
+    if (!isObject(text)) {
+      obj = {
+        text,
+        align
+      } as ITablurColumn;
+
+      obj.padding = <any>padding;
+    }
+    obj.shift = false;
+    obj.padding = toPadding(obj.padding);
+    obj.isRepeat = true;
+    obj.borders = !isValue(obj.borders) ? false : obj.borders;
+    this.rows.push([obj]);
+
+    return this;
+
+  }
+
+  break() {
+
+    this.rows.push([{
+      text: '',
+      indent: 0,
+      borders: false,
+      shift: false,
+      padding: [0, 0, 0, 0]
+    }]);
+
+    return this;
+
+  }
+
+  build(): string[];
+  build(width: number): string[];
+  build(row: ITablurColumn[], width?: number): string[];
+  build(rows: ITablurColumn[][], width?: number): string[];
+  build(rows?: number | ITablurColumn[] | ITablurColumn[][], width?: number) {
+
+    if (isNumber(rows)) {
+      width = <number>rows;
+      rows = undefined;
+    }
+
+    rows = rows || this.rows;
+    let _rows = <ITablurColumn[][]>rows;
+
+    if (!Array.isArray(rows[0]))
+      _rows = [<any>_rows] as ITablurColumn[][];
+
+    const max = this.getMaxRow(_rows);
+    let maxWidth = width || max.width;
+    let borders = this.getBorders(maxWidth, this.options.border);
+
+    const columnized = _rows.reduce((a, c, i) => {
+
+      const hasBorders = borders && c[0].borders !== false;
+      const padTop = c[0].padding[0];
+      const padBtm = c[0].padding[2];
+
+      const renderedCol = this.columnize(c, maxWidth, max.columns);
+
+      let arr = [];
+
+      if (hasBorders && i === 0)
+        arr.push(borders.top);
+
+      if (padTop) {
+        arr = [...arr, ...seedArray(padTop, renderedCol.padRow)];
+      }
+
+      arr.push(renderedCol.row);
+
+      if (padBtm) {
+        arr = [...arr, ...seedArray(padBtm, renderedCol.padRow)];
+      }
+
+      const curr = c[0];
+      const prev = (_rows[i - 1] && _rows[i - 1][0]) || <any>{};
+      const next = (_rows[i + 1] && _rows[i + 1][0]) || <any>{};
+
+      if (borders && _rows.length > 1 && (i < (_rows.length - 1))) {
+
+        if (next.borders === false && curr.borders !== false)
+          arr.push(borders.bottom);
+
+        else if (c[0].borders === false && next.borders !== false)
+          arr.push(borders.top);
+
+        else if (curr.borders !== false)
+          arr.push(borders.horizontal);
+
+      }
+      else if (borders) {
+
+        if (i === 0 && c[0].borders !== false) {
+          if (_rows.length === 1)
+            arr.push(borders.bottom);
+        }
+
+        else if (i === _rows.length - 1 && c[0].borders !== false) {
+          arr.push(borders.bottom);
+        }
+
+      }
+
+      return [...a, ...arr];
+
+    }, [] as string[]);
+
+    return columnized;
 
   }
 
   toString() {
-    return this.render().join('\n');
+    let width = toContentWidth(this.options.width);
+    return this.build(width).join('\n');
   }
 
-  /**
-   * Writes table to output stream with optional wrapping.
-   * By default tables are wrapped with empty lines. Set to
-   * null to disable.
-   *
-   * @example .write();
-   * @example .write(process.stderr);
-   * @example .write('-------------------------------');
-   *
-   * @param wrap when true wrap with char repeated on top and bottom.
-   * @param stream optional NodeJS.Writeable stream to output to.
-   */
-  write(wrap: string | NodeJS.WritableStream = ' ', stream: NodeJS.WritableStream = process.stdout) {
-
-    if (!this._rows.length)
-      return;
-
-    let rendered = this.render();
-
-    if (typeof wrap === 'object') {
-      stream = wrap as NodeJS.WritableStream;
-      wrap = undefined;
-    }
-
-    wrap = '';
-
-    if (wrap) {
-
-      const len = stripAnsi(rendered[0]).length;
-      const isNewLine = /[\n]/.test(<string>wrap);
-
-      // Don't repeat simple new lines.
-      if (wrap === '' || /[\n]/.test(<string>wrap)) {
-        rendered = ['', ...rendered, ''];
-      }
-
-      // Repeat the provided string.
-      else if (wrap && typeof wrap === 'string') {
-        wrap = (wrap as any).repeat(len);
-        rendered = [wrap, ...rendered, wrap] as string[];
-      }
-
-    }
-
-    let result = rendered.join('\n');
-    const border = this.options.borders[this.options.border];
-    let borders;
-
-    if (border && this.options.borderColor) {
-      borders = Object.keys(this.options.borders[this.options.border]).map(k => TABLER_BORDERS.round[k]).join('|');
-      result = result.replace(new RegExp('(' + borders + ')', 'g'), (s) => this.colorize(s, this.options.borderColor));
-    }
-
-    stream.write(result + '\n');
-
-  }
-
-  /**
-   * Clears all current rows.
-   */
-  clear() {
-    this._rows = [];
+  render(wrap?: boolean) {
+    let str = this.toString();
+    if (wrap)
+      str = '\n' + str + '\n';
+    this.options.stream.write(str + '\n');
     return this;
   }
 
-  /**
-   * Reset all rows and options.
-   *
-   * @param options pass new options.
-   */
-  reset(options?: ITablurOptions) {
-    this.clear();
-    this.options = Object.assign({}, DEFAULTS, options);
-    this._header = undefined;
-    this._footer = undefined;
-    this.init();
+  clear() {
+    this.rows = [];
+    return this;
+  }
+
+  reset(options?: ITablurOptions | boolean, debug?: boolean) {
+    options = options || this.options;
+    this
+      .clear()
+      .init(options, debug);
     return this;
   }
 
 }
+
+
 

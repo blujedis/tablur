@@ -1,6 +1,6 @@
 {
   "name": "tablur",
-  "version": "1.0.8",
+  "version": "1.2.0",
   "description": "Easily create tables for your cli.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -73,7 +73,6 @@
     "@types/node": "^10.5.2",
     "benchmark": "^2.1.4",
     "chai": "^4.1.2",
-    "cliui": "^4.1.0",
     "mocha": "^5.1.1",
     "nyc": "^11.8.0",
     "stiks": "^1.1.6",
@@ -84,9 +83,8 @@
   },
   "dependencies": {
     "colurs": "^1.0.29",
-    "string-width": "^2.1.1",
     "strip-ansi": "^4.0.0",
     "term-size": "^1.2.0",
-    "wrap-ansi": "^3.0.1"
+    "wrap-ansi": "^4.0.0"
   }
 }

@@ -1,11 +1,11 @@
                                Tablur CLI Tables                                
 
-app run --dev             Runs the app.                                 Alias: r
-app create <name>         Creates an app.                               Alias: c
-                                                                                
+app run --dev      Runs the app.                                        Alias: r
+app create <name>  Creates an app.                                      Alias: c
+
 Options:                                                                        
                                                                                 
- <name>                   App name to create.                [string] [required]
- --dev, -d                Runs in dev mode.                            [boolean]
+ <name>            App name to create.                       [string] [required]
+ --dev, -d         Runs in dev mode.                                   [boolean]
 
                                  © 2018 Tablur                                  

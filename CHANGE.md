@@ -2,6 +2,15 @@
 
 List of changes in descending order.
 
+### (BREAKING CHANGES) 10.06.2018 (v1.2.0)
+
+Refactor of Tablur better handling of ansi styling within table content. Better padding support. 
+Simplified API. Removed .header() and .footer() in favor of just using .section() or .row() in order.
+
+<table>
+  <tr><td>Version 1.2</td><td>Push new minor version.</td></tr>
+</table>
+
 ### 07.15.2018 (v1.0.8)
 
 <table>
