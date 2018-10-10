@@ -128,6 +128,31 @@ table.render(<span class="hljs-literal">true</span>);
 <span class="hljs-comment">// use : for padding order is top, right, bottom, left</span>
 table.row(<span class="hljs-string">'Username|30|left|0:1:0:1'</span>, <span class="hljs-string">'Email|50'</span>);
 </code></pre>
+				<h3 id="debug">Debug</h3>
+				<p>What to know what&#39;s going on with Tablur&#39;s output? Create table passing in &quot;true&quot; to show padding, alignment and shifting. This was used during development but found it so handy just left it in. If something isn&#39;t responding as you expect give it a try, it will do one of two things. 1) Help you adjust your column or 2) show you a bug we need to fix!</p>
+				<pre><code class="lang-ts"><span class="hljs-keyword">const</span> table = <span class="hljs-keyword">new</span> Tablur(<span class="hljs-literal">true</span>);
+
+<span class="hljs-comment">// OR</span>
+
+<span class="hljs-keyword">const</span> table = <span class="hljs-keyword">new</span> Tablur({ <span class="hljs-comment">/* options here */</span> }, <span class="hljs-literal">true</span>);
+</code></pre>
+				<p>Characters</p>
+				<p><strong>A</strong> - Represents alignment padding.
+					<strong>P</strong> - Represents padding.
+					<strong>S</strong> - Represents shifted text at boundary.
+				<strong>&gt;</strong> - Represents indent spaces.</p>
+				<pre><code class="lang-sh">╭──────────────────────────────────────────────────────────╮
+│Root Path:AAAAAAAA │ .myappAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Import Path:AAAAAA │ dist/myapp.jsAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Source Path:AAAAAA │ src/myapp.tsAAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Output Path:AAAAAA │ srcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA│
+│──────────────────────────────────────────────────────────│
+│Template:AAAAAAAAA │ my.template.jsAAAAAAAAAAAAAAAAAAAAAAA│
+╰──────────────────────────────────────────────────────────╯
+</code></pre>
 				<h2 id="options">Options</h2>
 				<p>A quick note on &quot;padding&quot;. The vertical padding is not 1 to 1. This is because it gets pretty huge when you do that. Hence verticle padding is divided by 2. This looks a little better when scaling padding. Just keep that in mind.</p>
 				<table>

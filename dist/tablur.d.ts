@@ -1,5 +1,5 @@
 import { IColurs } from 'colurs';
-import { TablurPadding, ITablurOptions, ITablurBorder, ITablurTokens, ITablurColumn, TablurAlign, TablurBorder, ITablurColumnGlobal } from './interfaces';
+import { TablurPadding, ITablurOptions, ITablurBorder, ITablurTokens, ITablurColumn, TablurAlign, TablurBorder, ITablurColumnGlobal, TablurType } from './interfaces';
 export declare class Tablur {
     options: ITablurOptions;
     border: ITablurBorder;
@@ -12,6 +12,7 @@ export declare class Tablur {
     private pad;
     private shiftLine;
     private stringLength;
+    private ensureString;
     padLeft(str: string, width: number, char: string): string;
     padCenter(str: string, width: number, char: string): string;
     padRight(str: string, width: number, char: string): string;
@@ -27,23 +28,23 @@ export declare class Tablur {
         columns: any[];
     };
     normalize(column: ITablurColumn): ITablurColumn[];
-    normalize(columns: string[] | ITablurColumn[], globals?: ITablurColumnGlobal): ITablurColumn[];
-    normalize(text: string): ITablurColumn[];
-    normalize(text: string, align: TablurAlign, padding?: TablurPadding): ITablurColumn[];
-    normalize(text: string, width: number, align?: TablurAlign, padding?: TablurPadding): ITablurColumn[];
+    normalize(columns: TablurType[] | ITablurColumn[], globals?: ITablurColumnGlobal): ITablurColumn[];
+    normalize(text: TablurType): ITablurColumn[];
+    normalize(text: TablurType, align: TablurAlign, padding?: TablurPadding): ITablurColumn[];
+    normalize(text: TablurType, width: number, align?: TablurAlign, padding?: TablurPadding): ITablurColumn[];
     columnize(cols: ITablurColumn[], maxWidth: number, maxColumns: number[]): {
         row: string;
         padRow: string;
     };
     row(column: ITablurColumn): Tablur;
-    row(columns: string[] | ITablurColumn[], globals?: ITablurColumnGlobal): Tablur;
-    row(text: string): Tablur;
-    row(text: string, align: TablurAlign, padding?: TablurPadding): Tablur;
-    row(text: string, width: number, align?: TablurAlign, padding?: TablurPadding): Tablur;
+    row(columns: TablurType[] | ITablurColumn[], globals?: ITablurColumnGlobal): Tablur;
+    row(text: TablurType): Tablur;
+    row(text: TablurType, align: TablurAlign, padding?: TablurPadding): Tablur;
+    row(text: TablurType, width: number, align?: TablurAlign, padding?: TablurPadding): Tablur;
     section(column: ITablurColumn): Tablur;
-    section(text: string): Tablur;
-    section(text: string, padding: TablurPadding): Tablur;
-    section(text: string, align: TablurAlign, padding?: TablurPadding): Tablur;
+    section(text: TablurType): Tablur;
+    section(text: TablurType, padding: TablurPadding): Tablur;
+    section(text: TablurType, align: TablurAlign, padding?: TablurPadding): Tablur;
     repeat(text: string): Tablur;
     repeat(column: ITablurColumn): Tablur;
     repeat(text: string, padding: TablurPadding): Tablur;

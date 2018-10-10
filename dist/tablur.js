@@ -178,6 +178,17 @@ var Tablur = /** @class */ (function () {
         };
         return fn(str);
     };
+    Tablur.prototype.ensureString = function (val) {
+        if (chek_1.isUndefined(val))
+            return '';
+        if (chek_1.isString(val))
+            return val;
+        if (chek_1.isObject(val) && !chek_1.isDate(val) && !chek_1.isRegExp(val))
+            return util_1.inspect(val);
+        if (val['toString'])
+            return val.toString();
+        return val + '';
+    };
     Tablur.prototype.padLeft = function (str, width, char) {
         return this.pad(str, 'left', width, char);
     };
@@ -220,7 +231,7 @@ var Tablur = /** @class */ (function () {
             columns.forEach(function (col, i) {
                 var len = (col.width || _this.stringLength(col.text));
                 if (!widthOnly) {
-                    len += col.indent;
+                    len += col.indent || 0;
                     len += (col.padding[1] + col.padding[3]);
                 }
                 result.columns[i] = result.columns[i] || 0;
@@ -243,6 +254,7 @@ var Tablur = /** @class */ (function () {
         return totals;
     };
     Tablur.prototype.normalize = function (text, width, align, padding) {
+        var _this = this;
         if (chek_1.isString(width)) {
             padding = align;
             align = width;
@@ -315,11 +327,8 @@ var Tablur = /** @class */ (function () {
                     text: c
                 };
             }
-            // Ensure text is string.
-            // Don't colorize user should do
-            // so if that is desired.
-            if (!chek_1.isString(c.text))
-                c.text = util_1.inspect(c.text, undefined, undefined, false);
+            // Ensure value is a string.
+            c.text = _this.ensureString(c.text);
             c = Object.assign({}, colDefaults, c, globalOpts);
             c.align = c.align || 'left';
             c.padding = toPadding(c.padding, padding);

@@ -10,6 +10,8 @@ export type TablurPadding = number | [number, number, number, number];
 export type TablurBorderColor = 'red' | 'green' | 'blue' | 'yellow' | 'cyan' | 'magenta' | 'black' |
   'gray' | 'redBright' | 'greenBright' | 'blueBright' | 'cyanBright' | 'yellowBright' | 'magentaBright';
 
+export type TablurType = string | number | boolean | RegExp | Date | object;
+
 // INTERFACES //
 
 export interface ITablurBorder {

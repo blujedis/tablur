@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>ITablurBorder | Tablur</title>
+	<title>ITablurColumnGlobal | Tablur</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -59,10 +59,10 @@
 					<a href="../modules/_interfaces_.html">&quot;interfaces&quot;</a>
 				</li>
 				<li>
-					<a href="_interfaces_.itablurborder.html">ITablurBorder</a>
+					<a href="_interfaces_.itablurcolumnglobal.html">ITablurColumnGlobal</a>
 				</li>
 			</ul>
-			<h1>Interface ITablurBorder</h1>
+			<h1>Interface ITablurColumnGlobal</h1>
 		</div>
 	</div>
 </header>
@@ -73,7 +73,12 @@
 				<h3>Hierarchy</h3>
 				<ul class="tsd-hierarchy">
 					<li>
-						<span class="target">ITablurBorder</span>
+						<a href="_interfaces_.itablurcolumnbase.html" class="tsd-signature-type">ITablurColumnBase</a>
+						<ul class="tsd-hierarchy">
+							<li>
+								<span class="target">ITablurColumnGlobal</span>
+							</li>
+						</ul>
 					</li>
 				</ul>
 			</section>
@@ -81,79 +86,85 @@
 				<h2>Index</h2>
 				<section class="tsd-panel tsd-index-panel">
 					<div class="tsd-index-content">
-						<section class="tsd-index-section ">
+						<section class="tsd-index-section tsd-is-inherited">
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_interfaces_.itablurborder.html#bottomleft" class="tsd-kind-icon">bottom<wbr>Left</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_interfaces_.itablurborder.html#bottomright" class="tsd-kind-icon">bottom<wbr>Right</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_interfaces_.itablurborder.html#horizontal" class="tsd-kind-icon">horizontal</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_interfaces_.itablurborder.html#topleft" class="tsd-kind-icon">top<wbr>Left</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_interfaces_.itablurborder.html#topright" class="tsd-kind-icon">top<wbr>Right</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_interfaces_.itablurborder.html#vertical" class="tsd-kind-icon">vertical</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-inherited"><a href="_interfaces_.itablurcolumnglobal.html#align" class="tsd-kind-icon">align</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-inherited"><a href="_interfaces_.itablurcolumnglobal.html#borders" class="tsd-kind-icon">borders</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-inherited"><a href="_interfaces_.itablurcolumnglobal.html#indent" class="tsd-kind-icon">indent</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-inherited"><a href="_interfaces_.itablurcolumnglobal.html#padding" class="tsd-kind-icon">padding</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-inherited"><a href="_interfaces_.itablurcolumnglobal.html#shift" class="tsd-kind-icon">shift</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-inherited"><a href="_interfaces_.itablurcolumnglobal.html#width" class="tsd-kind-icon">width</a></li>
 							</ul>
 						</section>
 					</div>
 				</section>
 			</section>
-			<section class="tsd-panel-group tsd-member-group ">
+			<section class="tsd-panel-group tsd-member-group tsd-is-inherited">
 				<h2>Properties</h2>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="bottomleft" class="tsd-anchor"></a>
-					<h3>bottom<wbr>Left</h3>
-					<div class="tsd-signature tsd-kind-icon">bottom<wbr>Left<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+					<a name="align" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> align</h3>
+					<div class="tsd-signature tsd-kind-icon">align<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
+						<p>Inherited from <a href="_interfaces_.itablurcolumnbase.html">ITablurColumnBase</a>.<a href="_interfaces_.itablurcolumnbase.html#align">align</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L20">interfaces.ts:20</a></li>
+							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L37">interfaces.ts:37</a></li>
 						</ul>
 					</aside>
 				</section>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="bottomright" class="tsd-anchor"></a>
-					<h3>bottom<wbr>Right</h3>
-					<div class="tsd-signature tsd-kind-icon">bottom<wbr>Right<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+					<a name="borders" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> borders</h3>
+					<div class="tsd-signature tsd-kind-icon">borders<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
 					<aside class="tsd-sources">
+						<p>Inherited from <a href="_interfaces_.itablurcolumnbase.html">ITablurColumnBase</a>.<a href="_interfaces_.itablurcolumnbase.html#borders">borders</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L21">interfaces.ts:21</a></li>
+							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L41">interfaces.ts:41</a></li>
 						</ul>
 					</aside>
 				</section>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="horizontal" class="tsd-anchor"></a>
-					<h3>horizontal</h3>
-					<div class="tsd-signature tsd-kind-icon">horizontal<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+					<a name="indent" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> indent</h3>
+					<div class="tsd-signature tsd-kind-icon">indent<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
+						<p>Inherited from <a href="_interfaces_.itablurcolumnbase.html">ITablurColumnBase</a>.<a href="_interfaces_.itablurcolumnbase.html#indent">indent</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L22">interfaces.ts:22</a></li>
+							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L39">interfaces.ts:39</a></li>
 						</ul>
 					</aside>
 				</section>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="topleft" class="tsd-anchor"></a>
-					<h3>top<wbr>Left</h3>
-					<div class="tsd-signature tsd-kind-icon">top<wbr>Left<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+					<a name="padding" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> padding</h3>
+					<div class="tsd-signature tsd-kind-icon">padding<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span></div>
 					<aside class="tsd-sources">
+						<p>Inherited from <a href="_interfaces_.itablurcolumnbase.html">ITablurColumnBase</a>.<a href="_interfaces_.itablurcolumnbase.html#padding">padding</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L18">interfaces.ts:18</a></li>
+							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L38">interfaces.ts:38</a></li>
 						</ul>
 					</aside>
 				</section>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="topright" class="tsd-anchor"></a>
-					<h3>top<wbr>Right</h3>
-					<div class="tsd-signature tsd-kind-icon">top<wbr>Right<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+					<a name="shift" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> shift</h3>
+					<div class="tsd-signature tsd-kind-icon">shift<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
 					<aside class="tsd-sources">
+						<p>Inherited from <a href="_interfaces_.itablurcolumnbase.html">ITablurColumnBase</a>.<a href="_interfaces_.itablurcolumnbase.html#shift">shift</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L19">interfaces.ts:19</a></li>
+							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L40">interfaces.ts:40</a></li>
 						</ul>
 					</aside>
 				</section>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="vertical" class="tsd-anchor"></a>
-					<h3>vertical</h3>
-					<div class="tsd-signature tsd-kind-icon">vertical<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+					<a name="width" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> width</h3>
+					<div class="tsd-signature tsd-kind-icon">width<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
+						<p>Inherited from <a href="_interfaces_.itablurcolumnbase.html">ITablurColumnBase</a>.<a href="_interfaces_.itablurcolumnbase.html#width">width</a></p>
 						<ul>
-							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L23">interfaces.ts:23</a></li>
+							<li>Defined in <a href="https://github.com/blujedis/tablur/blob/63ef285/src/interfaces.ts#L36">interfaces.ts:36</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -178,33 +189,9 @@
 			</nav>
 			<nav class="tsd-navigation secondary menu-sticky">
 				<ul class="before-current">
-				</ul>
-				<ul class="current">
-					<li class="current tsd-kind-interface tsd-parent-kind-external-module">
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
 						<a href="_interfaces_.itablurborder.html" class="tsd-kind-icon">ITablur<wbr>Border</a>
-						<ul>
-							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_interfaces_.itablurborder.html#bottomleft" class="tsd-kind-icon">bottom<wbr>Left</a>
-							</li>
-							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_interfaces_.itablurborder.html#bottomright" class="tsd-kind-icon">bottom<wbr>Right</a>
-							</li>
-							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_interfaces_.itablurborder.html#horizontal" class="tsd-kind-icon">horizontal</a>
-							</li>
-							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_interfaces_.itablurborder.html#topleft" class="tsd-kind-icon">top<wbr>Left</a>
-							</li>
-							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_interfaces_.itablurborder.html#topright" class="tsd-kind-icon">top<wbr>Right</a>
-							</li>
-							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_interfaces_.itablurborder.html#vertical" class="tsd-kind-icon">vertical</a>
-							</li>
-						</ul>
 					</li>
-				</ul>
-				<ul class="after-current">
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
 						<a href="_interfaces_.itablurborders.html" class="tsd-kind-icon">ITablur<wbr>Borders</a>
 					</li>
@@ -214,9 +201,33 @@
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
 						<a href="_interfaces_.itablurcolumnbase.html" class="tsd-kind-icon">ITablur<wbr>Column<wbr>Base</a>
 					</li>
-					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+				</ul>
+				<ul class="current">
+					<li class="current tsd-kind-interface tsd-parent-kind-external-module">
 						<a href="_interfaces_.itablurcolumnglobal.html" class="tsd-kind-icon">ITablur<wbr>Column<wbr>Global</a>
+						<ul>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+								<a href="_interfaces_.itablurcolumnglobal.html#align" class="tsd-kind-icon">align</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+								<a href="_interfaces_.itablurcolumnglobal.html#borders" class="tsd-kind-icon">borders</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+								<a href="_interfaces_.itablurcolumnglobal.html#indent" class="tsd-kind-icon">indent</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+								<a href="_interfaces_.itablurcolumnglobal.html#padding" class="tsd-kind-icon">padding</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+								<a href="_interfaces_.itablurcolumnglobal.html#shift" class="tsd-kind-icon">shift</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-inherited">
+								<a href="_interfaces_.itablurcolumnglobal.html#width" class="tsd-kind-icon">width</a>
+							</li>
+						</ul>
 					</li>
+				</ul>
+				<ul class="after-current">
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
 						<a href="_interfaces_.itablurcolumninternal.html" class="tsd-kind-icon">ITablur<wbr>Column<wbr>Internal</a>
 					</li>

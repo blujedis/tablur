@@ -1,11 +1,11 @@
 import * as stripAnsi from 'strip-ansi';
 import * as wrapAnsi from 'wrap-ansi';
-import { isBoolean, isString, isNumber, isObject, includes, isValue, last, first, isPlainObject, isUndefined } from 'chek';
+import { isBoolean, isString, isNumber, isDate, isRegExp, isObject, includes, isValue, last, first, isPlainObject, isUndefined } from 'chek';
 import { Colurs, IColurs } from 'colurs';
 import { inspect } from 'util';
 import * as termSize from 'term-size';
 
-import { TablurPadding, ITablurOptions, ITablurBorders, ITablurBorder, ITablurTokens, ITablurColumn, TablurAlign, TablurBorder, ITablurColumnGlobal } from './interfaces';
+import { TablurPadding, ITablurOptions, ITablurBorders, ITablurBorder, ITablurTokens, ITablurColumn, TablurAlign, TablurBorder, ITablurColumnGlobal, TablurType } from './interfaces';
 
 
 // HELPERS //
@@ -225,6 +225,18 @@ export class Tablur {
 
   }
 
+  private ensureString(val: any) {
+    if (isUndefined(val))
+      return '';
+    if (isString(val))
+      return val;
+    if (isObject(val) && !isDate(val) && !isRegExp(val))
+      return inspect(val);
+    if (val['toString'])
+      return val.toString();
+    return val + '';
+  }
+
   padLeft(str: string, width: number, char: string) {
     return this.pad(str, 'left', width, char);
   }
@@ -283,7 +295,7 @@ export class Tablur {
         let len = (col.width || this.stringLength(col.text));
 
         if (!widthOnly) {
-          len += col.indent;
+          len += col.indent || 0;
           len += (col.padding[1] + col.padding[3]);
         }
 
@@ -320,11 +332,11 @@ export class Tablur {
   }
 
   normalize(column: ITablurColumn): ITablurColumn[];
-  normalize(columns: string[] | ITablurColumn[], globals?: ITablurColumnGlobal): ITablurColumn[];
-  normalize(text: string): ITablurColumn[];
-  normalize(text: string, align: TablurAlign, padding?: TablurPadding): ITablurColumn[];
-  normalize(text: string, width: number, align?: TablurAlign, padding?: TablurPadding): ITablurColumn[];
-  normalize(text: any | ITablurColumn | any[] | ITablurColumn[], width?: number | TablurAlign | ITablurColumnGlobal,
+  normalize(columns: TablurType[] | ITablurColumn[], globals?: ITablurColumnGlobal): ITablurColumn[];
+  normalize(text: TablurType): ITablurColumn[];
+  normalize(text: TablurType, align: TablurAlign, padding?: TablurPadding): ITablurColumn[];
+  normalize(text: TablurType, width: number, align?: TablurAlign, padding?: TablurPadding): ITablurColumn[];
+  normalize(text: TablurType | ITablurColumn | TablurType[] | ITablurColumn[], width?: number | TablurAlign | ITablurColumnGlobal,
     align?: TablurPadding | TablurAlign, padding?: TablurPadding): ITablurColumn[] {
 
     if (isString(width)) {
@@ -418,11 +430,8 @@ export class Tablur {
         };
       }
 
-      // Ensure text is string.
-      // Don't colorize user should do
-      // so if that is desired.
-      if (!isString(c.text))
-        c.text = inspect(c.text, undefined, undefined, false);
+      // Ensure value is a string.
+      c.text = this.ensureString(c.text);
 
       c = Object.assign({}, colDefaults, c, globalOpts);
 
@@ -660,11 +669,11 @@ export class Tablur {
   }
 
   row(column: ITablurColumn): Tablur;
-  row(columns: string[] | ITablurColumn[], globals?: ITablurColumnGlobal): Tablur;
-  row(text: string): Tablur;
-  row(text: string, align: TablurAlign, padding?: TablurPadding): Tablur;
-  row(text: string, width: number, align?: TablurAlign, padding?: TablurPadding): Tablur;
-  row(text: any | ITablurColumn | any[] | ITablurColumn[], width?: number | TablurAlign | ITablurColumnGlobal,
+  row(columns: TablurType[] | ITablurColumn[], globals?: ITablurColumnGlobal): Tablur;
+  row(text: TablurType): Tablur;
+  row(text: TablurType, align: TablurAlign, padding?: TablurPadding): Tablur;
+  row(text: TablurType, width: number, align?: TablurAlign, padding?: TablurPadding): Tablur;
+  row(text: TablurType | ITablurColumn | TablurType[] | ITablurColumn[], width?: number | TablurAlign | ITablurColumnGlobal,
     align?: TablurPadding | TablurAlign, padding?: TablurPadding): Tablur {
     const self = this;
     const normalized = this.normalize(text, <any>width, <any>align, padding);
@@ -673,10 +682,10 @@ export class Tablur {
   }
 
   section(column: ITablurColumn): Tablur;
-  section(text: string): Tablur;
-  section(text: string, padding: TablurPadding): Tablur;
-  section(text: string, align: TablurAlign, padding?: TablurPadding): Tablur;
-  section(text: string | ITablurColumn, align?: TablurPadding | TablurAlign, padding?: TablurPadding) {
+  section(text: TablurType): Tablur;
+  section(text: TablurType, padding: TablurPadding): Tablur;
+  section(text: TablurType, align: TablurAlign, padding?: TablurPadding): Tablur;
+  section(text: TablurType | ITablurColumn, align?: TablurPadding | TablurAlign, padding?: TablurPadding) {
 
     let obj = <ITablurColumn>text;
 

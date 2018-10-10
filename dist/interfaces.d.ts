@@ -4,6 +4,7 @@ export declare type TablurStringLength = (str: string) => number;
 export declare type TablurBorder = keyof ITablurBorders;
 export declare type TablurPadding = number | [number, number, number, number];
 export declare type TablurBorderColor = 'red' | 'green' | 'blue' | 'yellow' | 'cyan' | 'magenta' | 'black' | 'gray' | 'redBright' | 'greenBright' | 'blueBright' | 'cyanBright' | 'yellowBright' | 'magentaBright';
+export declare type TablurType = string | number | boolean | RegExp | Date | object;
 export interface ITablurBorder {
     topLeft: string;
     topRight: string;

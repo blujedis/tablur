@@ -2,6 +2,12 @@
 
 List of changes in descending order.
 
+### 10.08.2018 (v1.2.1)
+
+<table>
+  <tr><td>.columnize</td><td>fix issue with indent where single col tables blow up.</td></tr>
+</table>
+
 ### (BREAKING CHANGES) 10.06.2018 (v1.2.0)
 
 Refactor of Tablur better handling of ansi styling within table content. Better padding support. 
